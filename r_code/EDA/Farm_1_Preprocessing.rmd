@@ -1,0 +1,282 @@
+---
+title: "Farm_1_EDA"
+author: "Thomas FitzGerald"
+date: "2023-02-13"
+output: html_document
+---
+
+```{r}
+library(readxl)
+library(dplyr)
+library(plotly)
+library(ggplot2)
+
+library(stringr)
+library(lubridate)
+```
+
+```{r}
+
+time.column.list<-c('Farm','Device_Type','Date','Date_Time','Animal_Number','Address','Event_Type',
+       'Lactation_Days','Lactation_Number','Milkings',
+       'Routing_Direction','Refusal_Type','Failure','Interval',
+       'Milk_Time','Milk_Yield','Milk_Speed','Box_Time','Intake_1','Intake_2')
+
+date.column.list<-c('Farm','Device_Type','Date','Animal_Number','Rumination_Minutes','Total_Eating_Minutes','Chews_Per_Bolus',
+                    'Total_Intake_1','Total_Intake_2','Rest_Feed_1','Rest_Feed_2','Total_1','Total_2')
+
+farm1_time_preprocessor <- function(df){
+  rejected.column.list <- c('Animal_Tag_Id','Device_Name','Visit_Result')
+  na_or_not.column.list <- c("Current_Lactation","Failure")
+  
+  colnames(df)<-str_replace(str_replace(colnames(df),' ','_'),' ','_')
+
+  df <- df %>% select(-any_of(rejected.column.list))
+
+  #Converts to seconds
+  df$Box_Time <- time_length(interval(start="1899-12-31 00:00:00 UTC", end=df$Box_Time)) /60 #Assumed minute:second
+  df$Milk_Time <- time_length(interval(start="1899-12-31 00:00:00 UTC", end=df$Milk_Time)) /60 #Assumed minute:second
+  df$Interval <- time_length(interval(start="1899-12-31 00:00:00 UTC", end=df$Interval)) #Assumed hour:minute
+  
+  #Convert 'x'/NA columns to boolean if they exist
+  df <- df %>% mutate(across(matches(na_or_not.column.list),
+                       function(df,col_name) df[col_name] <- ifelse(is.na(df[col_name]),0,1)))
+
+  if(!('Date' %in% colnames(df))){
+    df <- df %>% mutate(Date = as.Date(Date_Time, format = "%d.%m.%Y"))
+    }
+  
+
+  
+  #Finalize
+  df <- df %>% mutate(Farm='Farm_1',
+                      Event_Type=NA)
+  for (x in time.column.list){
+    if(!x %in% colnames(df)){
+      df[[x]]<-NA
+    }
+  }
+  df <- df %>% relocate(time.column.list)
+  
+  return(df)
+}
+
+farm1_date_preprocessor <- function(df){
+  colnames(df)[which(colnames(df)=='Total Intake')+1] <- 'Total Intake 2'
+  colnames(df)[which(colnames(df)=='Total Intake')] <- 'Total Intake 1'
+  
+  colnames(df)[which(colnames(df)=='Total')+1] <- 'Total 2'
+  colnames(df)[which(colnames(df)=='Total')] <- 'Total 1'
+  
+  colnames(df)[which(colnames(df)=='Rest Feed')+1] <- 'Rest Feed 2'
+  colnames(df)[which(colnames(df)=='Rest Feed')] <- 'Rest Feed 1'
+  
+  #Re-format column names
+  colnames(df)<-str_replace_all(colnames(df),' ','_')
+  
+  #Remove header line from data
+  df<-df[2:nrow(df),]
+  
+  #Remove redundant columns
+  rejected.column.list <- c('Animal_Tag_Id','Lactation_Days','Lactation_Number')
+  
+  df <- df %>% select(-any_of(rejected.column.list))
+  
+  #Fix numeric column formatting
+  df <- df %>% mutate_if(is.character,as.numeric)
+  
+  #Re-order columns
+  df <- df %>% relocate(Date,Animal_Number)
+  
+  return(df)
+}
+```
+
+```{r}
+#farm1_preprocessor<-function(df.list){
+  df.time <- data.frame(Farm=character(),
+                 Device_Type=character(),
+                 Date=POSIXct(),
+                 Date_Time=POSIXct(),
+                 Animal_Number=numeric(),
+                 Address=numeric(),
+                 Event_Type=character(),
+                 Lactation_Days=numeric(),
+                 Lactation_Number=numeric(),
+                 Routing_Direction=character(),
+                 Refusal_Type=character(),
+                 Failure=logical(),
+                 Interval=numeric(),
+                 Milkings=numeric(),
+                 Milk_Time=numeric(),
+                 Milk_Yield=numeric(),
+                 Milk_Speed=numeric(),
+                 Box_Time=numeric(),
+                 Intake_1=numeric(),
+                 Intake_2=numeric()
+                 )
+  df.date <- data.frame(Farm=character(),
+                 Device_Type=character(),
+                 Date=POSIXct(),
+                 Animal_Number=numeric(),
+                 Rumination_Minutes=numeric(),
+                 Total_Eating_Minutes=numeric(),
+                 Chews_Per_Bolus=numeric(),
+                 Total_Intake_1=numeric(),
+                 Total_Intake_2=numeric(),
+                 Rest_Feed_1=numeric(),
+                 Rest_Feed_2=numeric(),
+                 Total_1=numeric(),
+                 Total_2=numeric()
+                 )
+  
+  filenames <- list.files(filepath<-'C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_1\\',
+                          pattern='*.xlsx',
+                          full.names=TRUE)
+
+  ###THIS NEEDS ADDITIONAL HANDLING###
+  for(x in filenames){
+    print(x)
+    df <-read_excel(path=x,
+               skip=7) #Rows 1-7 are not part of table for some 
+
+    if('Date Time' %in% colnames(df)){
+      print('time')
+      df.time <- merge(df.time,farm1_time_preprocessor(df),all.x=TRUE,all.y=TRUE)
+    } else {
+      print('date')
+      df.date <- merge(df.date,farm1_date_preprocessor(df),all.x=TRUE,all.y=TRUE)
+    }
+
+  }
+    df <- full_join(
+      df.time,
+      df.date,
+      by = c('Date','Animal_Number')
+    )
+    return(df)
+#}
+
+```
+
+
+```{r}
+df <- read_excel(path='C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_1\\Farm1 Milking 4.xlsx',skip=7)
+df <- farm1_time_preprocessor(df)
+df
+View(df)
+```
+
+
+
+```{r}
+df <- read.csv('C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_1\\HISTORY - Milking SHORT-1-4 days 2_17_2023.csv')
+df$Box.Time
+
+```
+
+```{r}
+df <- read_excel(path='C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_1\\Farm1 10-21-2022 Milking.xlsx',skip=7)
+df <- farm1_time_preprocessor(df)
+df
+```
+
+```{r}
+df <- read_excel(path='C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_1\\Farm1 11-17 to 12-16-22 Feeding.xlsx',skip=7)
+df <- farm1_date_preprocessor(df)
+df
+```
+```{r}
+df <- read_excel(path='C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_1\\Batch delivered history 120 days 2-17-23.xlsx')
+
+#If [2,1]=='Date/Time'
+#col3 = '...3'
+
+#Get correct column names
+version <- colnames(df[1,1])
+colnames(df)<-df[1,]
+#Dump NA columns
+df <- df[,which(is.na(df[3,])==FALSE)]
+
+#Correct column names
+colnames(df)[1] <- 'Date_Time'
+colnames(df)[which(colnames(df)=='Call Wt.\r\nActual Wt.')+1] <- 'Call_Weight_Dry'
+colnames(df)[which(colnames(df)=='Call Wt.\r\nActual Wt.')] <- 'Call_Weight_Actual'
+
+colnames(df)[which(colnames(df)=='Delivered Wt.\r\nActual       Dry\r\nWt.       Wt.')+1] <- 'Delivered_Weight_Dry'
+colnames(df)[which(colnames(df)=='Delivered Wt.\r\nActual       Dry\r\nWt.       Wt.')] <- 'Delivered_Weight_Actual'
+
+colnames(df)[which(colnames(df)=='Deviation\r\nDeviation      Error%')+1] <- 'Deviation_Error_Percent'
+colnames(df)[which(colnames(df)=='Deviation\r\nDeviation      Error%')] <- 'Deviation'
+
+colnames(df)[which(colnames(df)=='Planned')] <- 'Planned_Price'
+colnames(df)[which(colnames(df)=='Price\r\nActual')] <- 'Actual_Price'
+colnames(df)[which(colnames(df)=='Error')] <- 'Price_Error'
+
+#Filter header & footer rows
+df <- df %>% filter(!Date_Time %in% c(version,'Date/Time','Average\r\nTotal'))
+
+#Populate Pen variable from Pen headers
+  df$Pen<-NA
+  header.list <- which(is.na(df$Recipe))
+  pen.list <- df$Date_Time[header.list]
+  
+  x<-1
+  for(x in 1:length(header.list)){
+    #print(x)
+    start <- header.list[x]+1
+    if(x==length(header.list)){
+      end <- length(df$Pen)
+    } else {
+        end <- header.list[x+1]-1
+    }
+    df$Pen[start:end] <- pen.list[x]
+  }
+
+#Remove Pen headers
+df <- df %>% filter(!is.na(Recipe))
+df
+```
+
+```{r}
+df <- read_excel(path='C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_1\\DMI 60 days 10-16-22.xls')
+
+#Check if col 1 is named 'Date' & col 2 is named "...2"
+  #Rename Col 1 to 'Pen'
+  #Rename Col 2 to 'Date'
+  colnames(df)[1:2]<-c('Pen','Date')
+
+  #Dump subtotal rows
+df <- df %>% filter(!Pen %in% c('Average','Total'))
+
+  header.list <- which(df$Pen=='-')
+  pen.list <- df$Date[header.list]
+
+  x<-1
+  for(x in 1:length(header.list)){
+    print(x)
+    start <- header.list[x]+1
+    if(x==length(header.list)){
+      end <- length(df$Pen)
+    } else {
+        end <- header.list[x+1]-1
+    }
+    df$Pen[start:end] <- pen.list[x]
+  }
+
+df <- df %>% filter(!Pen == '-')
+df
+
+
+```
+
+
+
+
+```{r}
+View(subset(df,Failure=='x'))
+```
+
+
+
+

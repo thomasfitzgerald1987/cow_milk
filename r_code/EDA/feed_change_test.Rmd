@@ -1,0 +1,444 @@
+---
+title: "Feed_Change_Test"
+author: "Thomas FitzGerald"
+date: "2023-04-18"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(readxl)
+library(dplyr)
+library(plotly)
+library(ggplot2)
+
+library(stringr)
+library(lubridate)
+```
+
+```{r}
+#10-06 through 10-21
+df <- read_excel(path='C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_1\\Farm1 10-21-2022 Milking.xlsx',skip=7)
+```
+
+```{r}
+#10-17 through 10-31
+df <- read_excel(path='C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_1\\Farm1 Milking 4.xlsx',skip=7)
+milk.df <- farm1_time_preprocessor(df)
+milk.df <- milk.df %>% select('Farm','Date','Animal_Number','Lactation_Days','Milk_Yield','Milk_Yield_Expected')
+milk.df
+table(milk.df$Date)
+```
+
+```{r}
+df <- read.csv('C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_1\\HISTORY - Milking SHORT-0.csv')
+df.temp <- read.csv('C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_1\\HISTORY - Milking SHORT-1-4 days 2_17_2023.csv')
+df <- rbind(df,df.temp)
+df.temp <- read.csv('C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_1\\HISTORY - Milking SHORT-5-10 days 2_17_2023.csv')
+df <- rbind(df,df.temp)
+df.temp <- read.csv('C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_1\\HISTORY - Milking SHORT-11-15 days 2_17_2023.csv')
+df <- rbind(df,df.temp)
+df.temp <- read.csv('C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_1\\HISTORY - Milking SHORT-16-21 days 2_17_2023.csv')
+df <- rbind(df,df.temp)
+df.temp <- read.csv('C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_1\\HISTORY - Milking SHORT-22-26 days 2_17_2023.csv')
+df <- rbind(df,df.temp)
+df.temp <- read.csv('C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_1\\HISTORY - Milking SHORT-27-31 days 2_17_2023.csv')
+df <- rbind(df,df.temp)
+df.temp <- read.csv('C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_1\\HISTORY - Milking SHORT-32-36 days 2_17_2023.csv')
+df <- rbind(df,df.temp)
+df.temp <- read.csv('C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_1\\HISTORY - Milking SHORT-37-41 days 2_17_2023.csv')
+df <- rbind(df,df.temp)
+df.temp <- read.csv('C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_1\\HISTORY - Milking SHORT-42-46 days 2_17_2023.csv')
+df <- rbind(df,df.temp)
+df.temp <- read.csv('C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_1\\HISTORY - Milking SHORT-47-51 days 2_17_2023.csv')
+df <- rbind(df,df.temp)
+df.temp <- read.csv('C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_1\\HISTORY - Milking SHORT-52 - 56 days 2_17_2023.csv')
+df <- rbind(df,df.temp)
+df.temp <- read.csv('C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_1\\HISTORY - Milking SHORT-57 - 61 days 2_17_2023.csv')
+df <- rbind(df,df.temp)
+
+df <- df[!duplicated(df),]
+df <- subset(df,!is.na(Animal.Number))
+
+write.csv(df, 'C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_1\\HISTORY - Milking ALL.csv')
+```
+
+```{r}
+feed.df <- read.csv('C:\\Users\\Thoma\\OneDrive\\Desktop\\Feed_Samples\\feed_changes.csv')
+
+feed.df.1 <- arrange(feed.df,Description1)[1:17,] #17 rows for farm 1
+feed.df.2 <- arrange(feed.df,Description1)[18:24,]
+
+feed.df.1 <- feed.df.1 %>% mutate(Date = as.Date(Date_of_Change, format = "%m/%d/%Y")) %>% select(Description1,Date_of_Change,Date)
+feed.df.2 <- feed.df.2 %>% mutate(Date = as.Date(Date_of_Change, format = "%m/%d/%Y")) %>% select(Description1,Date_of_Change,Date)
+
+feed.df.1 %>% arrange(Date)
+feed.df.2 %>% arrange(Date)
+```
+
+```{r}
+df.1 <- read.csv('C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_1\\HISTORY - Milking ALL.csv')
+
+df.1 <- df.1 %>% mutate(Date.1 = as.Date(Date.Time, format = "%m/%d/%Y"))
+df.1 <- df.1 %>% mutate(Date.2 = as.Date(Date.Time, format = "%Y-%m-%d"))
+df.1 <- df.1 %>% mutate(Date = case_when(
+  is.na(Date.1) ~ Date.2,
+  is.na(Date.2) ~ Date.1))
+
+df.1$Milk.Yield.Dif <- df.1$Milk.Yield.Expected - df.1$Milk.Yield
+
+# df <- df %>% 
+#   mutate(Feed_Group=Date<"2023-01-04")
+```
+
+```{r}
+df.1.grouped <- 
+  subset(df.1,!is.na(Milk.Yield)) %>% #This should maybe be converting to 0 instead.  I _think_ they are all non-milking rows, though.
+  group_by(Date) %>%
+  summarise('Mean_Milk_Yield' = mean(Milk.Yield))
+
+df.1.grouped
+#Farm 1 Plot
+plot_ly(df.1.grouped, x = ~Date) %>%
+  add_trace(y = ~Mean_Milk_Yield, type= 'scatter', mode='lines') %>%
+  add_trace(x = as.Date("2022-11-11"), y=c(31,35), type='scatter', mode='lines') %>%
+  add_trace(x = as.Date("2022-12-16"), y=c(31,35), type='scatter', mode='lines') %>%
+  add_trace(x = as.Date("2023-01-04"), y=c(31,35), type='scatter', mode='lines') %>%
+  add_trace(x = as.Date("2023-02-14"), y=c(31,35), type='scatter', mode='lines')
+```
+
+
+```{r}
+df.1.grouped <- 
+  subset(df.1,!is.na(Milk.Yield.Dif)) %>% #This should maybe be converting to 0 instead.  I _think_ they are all non-milking rows, though.
+  group_by(Date) %>%
+  summarise('Mean_Milk_Yield' = mean(Milk.Yield.Dif))
+
+df.1.grouped
+#Farm 1 Plot
+plot_ly(df.1.grouped, x = ~Date) %>%
+  add_trace(y = ~Mean_Milk_Yield, type= 'scatter', mode='lines') %>%
+  add_trace(x = as.Date("2022-11-11"), y=c(-2,2), type='scatter', mode='lines') %>%
+  add_trace(x = as.Date("2022-12-16"), y=c(-2,2), type='scatter', mode='lines') %>%
+  add_trace(x = as.Date("2023-01-04"), y=c(-2,2), type='scatter', mode='lines') %>%
+  add_trace(x = as.Date("2023-02-14"), y=c(-2,2), type='scatter', mode='lines')
+```
+
+Farm 2
+
+```{r}
+#Takes formatted milking data
+df.2 <- read.csv('C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_2\\test_out.csv')
+df.2 <- df.2 %>% mutate(Date = as.Date(Date, format = "%m/%d/%Y"))
+#df.2$Milk.Yield.Dif <- df.2$Milk.Yield.Expected - df.2$Milk.Yield
+```
+
+Farm 2 Mean Milk Yield
+```{r}
+df.2.grouped <- 
+  subset(df.2,!is.na(Milk_Yield)) %>% #This should maybe be converting to 0 instead.  I _think_ they are all non-milking rows, though.
+  group_by(Date) %>%
+  summarise('Mean_Milk_Yield' = mean(Milk_Yield))
+#Farm 2 Plot
+plot_ly(subset(df.2.grouped,Date>as.Date("2022-11-01")), x = ~Date) %>%
+  add_trace(y = ~Mean_Milk_Yield, type= 'scatter', mode='lines') %>%
+  add_trace(x = as.Date("2022-11-11"), y=c(30,40), type='scatter', mode='lines') %>%
+  add_trace(x = as.Date("2022-11-30"), y=c(30,40), type='scatter', mode='lines') %>%
+  add_trace(x = as.Date("2022-12-14"), y=c(30,40), type='scatter', mode='lines') %>%
+  add_trace(x = as.Date("2023-02-01"), y=c(30,40), type='scatter', mode='lines')
+```
+
+```{r}
+df.2.grouped <- 
+  subset(df.2,!is.na(Total_Conductivity)) %>% #This should maybe be converting to 0 instead.  I _think_ they are all non-milking rows, though.
+  group_by(Date) %>%
+  summarise('Mean_Milk_Yield' = mean(Total_Conductivity))
+#Farm 2 Plot
+plot_ly(subset(df.2.grouped,Date>as.Date("2022-11-01")), x = ~Date) %>%
+  add_trace(y = ~Mean_Milk_Yield, type= 'scatter', mode='lines') %>%
+  add_trace(x = as.Date("2022-11-11"), y=c(15.5,17), type='scatter', mode='lines') %>%
+  add_trace(x = as.Date("2022-11-30"), y=c(15.5,17), type='scatter', mode='lines') %>%
+  add_trace(x = as.Date("2022-12-14"), y=c(15.5,17), type='scatter', mode='lines') %>%
+  add_trace(x = as.Date("2023-02-01"), y=c(15.5,17), type='scatter', mode='lines')
+```
+
+
+```{r}
+plot_ly(df.1.grouped, x = ~Date) %>%
+  add_trace(y = ~Mean_Milk_Yield, type= 'scatter', mode='lines') %>%
+  add_trace(data=subset(df.2.grouped,Date>as.Date("2022-11-01")), y = ~Mean_Milk_Yield, type = 'scatter', mode='lines')
+
+  #add_trace(x = as.Date("2022-11-11"), y=c(30,40), type='scatter', mode='lines') %>%
+  #add_trace(x = as.Date("2022-12-16"), y=c(30,40), type='scatter', mode='lines') %>%
+  #add_trace(x = as.Date("2023-01-04"), y=c(30,40), type='scatter', mode='lines') %>%
+  #add_trace(x = as.Date("2023-02-14"), y=c(30,40), type='scatter', mode='lines') %>%
+
+  #add_trace(x = as.Date("2022-11-11"), y=c(30,40), type='scatter', mode='lines') %>%
+  #add_trace(x = as.Date("2022-11-30"), y=c(30,40), type='scatter', mode='lines') %>%
+  #add_trace(x = as.Date("2022-12-14"), y=c(30,40), type='scatter', mode='lines') %>%
+  #add_trace(x = as.Date("2023-02-01"), y=c(30,40), type='scatter', mode='lines')
+```
+```{r}
+df.1.grouped <- 
+  subset(df.1,!is.na(Milk.Yield)) %>% #This should maybe be converting to 0 instead.  I _think_ they are all non-milking rows, though.
+  group_by(Animal.Number,Date) %>%
+  summarise('Mean_Milk_Yield' = mean(Milk.Yield))
+
+
+#Random 5 animals
+plot_ly(subset(df.1.grouped,Animal.Number %in% random.5), x = ~Date) %>%
+  add_trace(y = ~Mean_Milk_Yield, type= 'scatter', mode='lines')
+
+plot_ly(df.1.grouped, x = ~Date) %>%
+ add_trace(y = ~Mean_Milk_Yield,
+           type= 'scatter',
+           marker=list(size = 5,symbol='circle-open'),
+           opacity = .2)
+
+
+df.1.grouped.wide <- df.1.grouped %>% tidyr::spread(Date,Mean_Milk_Yield)
+df.1.grouped.wide <- df.1.grouped.wide[,-1]
+df.1.grouped.wide.mat <- replace(as.matrix(df.1.grouped.wide),is.na(as.matrix(df.1.grouped.wide)),0)
+plot_ly(z = df.1.grouped.wide.mat, type = "heatmap")
+```
+
+```{r}
+cow.list <- unique(df.2$Animal_Number)
+
+i <- 1
+  df.2.grouped <- 
+    subset(df.2,Animal_Number==cow.list[i]) %>% #This should maybe be converting to 0 instead.  I _think_ they are all non-milking rows, though.
+    group_by(Date) %>%
+    summarise('Mean_Milk_Yield' = mean(Milk_Yield))
+  #Farm 2 Plot
+  fig <- plot_ly(subset(df.2.grouped,Date>as.Date("2022-11-01")), x = ~Date) %>%
+    add_trace(y = ~Mean_Milk_Yield, type= 'scatter', mode='lines') %>%
+    add_trace(x = as.Date("2022-11-11"), y=c(0,50), type='scatter', mode='lines') %>%
+    add_trace(x = as.Date("2022-11-30"), y=c(0,50), type='scatter', mode='lines') %>%
+    add_trace(x = as.Date("2022-12-14"), y=c(0,50), type='scatter', mode='lines') %>%
+    add_trace(x = as.Date("2023-02-01"), y=c(0,50), type='scatter', mode='lines') %>%
+    layout(title = cow.list[i])
+  fig
+i <- i+1
+  df.2.grouped <- 
+    subset(df.2,Animal_Number==cow.list[i]) %>% #This should maybe be converting to 0 instead.  I _think_ they are all non-milking rows, though.
+    group_by(Date) %>%
+    summarise('Mean_Milk_Yield' = mean(Milk_Yield))
+  #Farm 2 Plot
+  fig <- plot_ly(subset(df.2.grouped,Date>as.Date("2022-11-01")), x = ~Date) %>%
+    add_trace(y = ~Mean_Milk_Yield, type= 'scatter', mode='lines') %>%
+    add_trace(x = as.Date("2022-11-11"), y=c(0,50), type='scatter', mode='lines') %>%
+    add_trace(x = as.Date("2022-11-30"), y=c(0,50), type='scatter', mode='lines') %>%
+    add_trace(x = as.Date("2022-12-14"), y=c(0,50), type='scatter', mode='lines') %>%
+    add_trace(x = as.Date("2023-02-01"), y=c(0,50), type='scatter', mode='lines') %>%
+    layout(title = cow.list[i])
+  fig
+i <- i+1
+  df.2.grouped <- 
+    subset(df.2,Animal_Number==cow.list[i]) %>% #This should maybe be converting to 0 instead.  I _think_ they are all non-milking rows, though.
+    group_by(Date) %>%
+    summarise('Mean_Milk_Yield' = mean(Milk_Yield))
+  #Farm 2 Plot
+  fig <- plot_ly(subset(df.2.grouped,Date>as.Date("2022-11-01")), x = ~Date) %>%
+    add_trace(y = ~Mean_Milk_Yield, type= 'scatter', mode='lines') %>%
+    add_trace(x = as.Date("2022-11-11"), y=c(0,50), type='scatter', mode='lines') %>%
+    add_trace(x = as.Date("2022-11-30"), y=c(0,50), type='scatter', mode='lines') %>%
+    add_trace(x = as.Date("2022-12-14"), y=c(0,50), type='scatter', mode='lines') %>%
+    add_trace(x = as.Date("2023-02-01"), y=c(0,50), type='scatter', mode='lines') %>%
+    layout(title = cow.list[i])
+  fig
+i <- i+1
+  df.2.grouped <- 
+    subset(df.2,Animal_Number==cow.list[i]) %>% #This should maybe be converting to 0 instead.  I _think_ they are all non-milking rows, though.
+    group_by(Date) %>%
+    summarise('Mean_Milk_Yield' = mean(Milk_Yield))
+  #Farm 2 Plot
+  fig <- plot_ly(subset(df.2.grouped,Date>as.Date("2022-11-01")), x = ~Date) %>%
+    add_trace(y = ~Mean_Milk_Yield, type= 'scatter', mode='lines') %>%
+    add_trace(x = as.Date("2022-11-11"), y=c(0,50), type='scatter', mode='lines') %>%
+    add_trace(x = as.Date("2022-11-30"), y=c(0,50), type='scatter', mode='lines') %>%
+    add_trace(x = as.Date("2022-12-14"), y=c(0,50), type='scatter', mode='lines') %>%
+    add_trace(x = as.Date("2023-02-01"), y=c(0,50), type='scatter', mode='lines') %>%
+    layout(title = cow.list[i])
+  fig
+i <- i+1
+  df.2.grouped <- 
+    subset(df.2,Animal_Number==cow.list[i]) %>% #This should maybe be converting to 0 instead.  I _think_ they are all non-milking rows, though.
+    group_by(Date) %>%
+    summarise('Mean_Milk_Yield' = mean(Milk_Yield))
+  #Farm 2 Plot
+  fig <- plot_ly(subset(df.2.grouped,Date>as.Date("2022-11-01")), x = ~Date) %>%
+    add_trace(y = ~Mean_Milk_Yield, type= 'scatter', mode='lines') %>%
+    add_trace(x = as.Date("2022-11-11"), y=c(0,50), type='scatter', mode='lines') %>%
+    add_trace(x = as.Date("2022-11-30"), y=c(0,50), type='scatter', mode='lines') %>%
+    add_trace(x = as.Date("2022-12-14"), y=c(0,50), type='scatter', mode='lines') %>%
+    add_trace(x = as.Date("2023-02-01"), y=c(0,50), type='scatter', mode='lines') %>%
+    layout(title = cow.list[i])
+  fig
+```
+
+Rumination
+```{r}
+
+df <- read.csv('C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_1\\HISTORY - Rumination-1-7 days 2_17_2023.csv')
+df.temp <- read.csv('C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_1\\HISTORY - Rumination-8-14 days 2_17_2023.csv')
+df <- rbind(df,df.temp)
+df.temp <- read.csv('C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_1\\HISTORY - Rumination-15-21 days 2_17_2023.csv')
+df <- rbind(df,df.temp)
+df.temp <- read.csv('C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_1\\HISTORY - Rumination-22-28 days 2_17_2023.csv')
+df <- rbind(df,df.temp)
+df.temp <- read.csv('C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_1\\HISTORY - Rumination-29-35 days 2_17_2023.csv')
+df <- rbind(df,df.temp)
+df.temp <- read.csv('C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_1\\HISTORY - Rumination-36-42 days 2_17_2023.csv')
+df <- rbind(df,df.temp)
+df.temp <- read.csv('C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_1\\HISTORY - Rumination-43-49 days 2_17_2023.csv')
+df <- rbind(df,df.temp)
+df.temp <- read.csv('C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_1\\HISTORY - Rumination-50-56 days 2_17_2023.csv')
+df <- rbind(df,df.temp)
+df.temp <- read.csv('C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_1\\HISTORY - Rumination-57-60 days 2_17_2023.csv')
+df <- rbind(df,df.temp)
+df.temp <- read.csv('C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_1\\HISTORY - Rumination-61-67 days 2_17_2023.csv')
+df <- rbind(df,df.temp)
+
+df <- df[!duplicated(df),]
+df <- subset(df,!is.na(Animal.Number))
+
+write.csv(df, 'C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_1\\HISTORY - Rumination ALL.csv')
+```
+
+```{r}
+df.1.rumination <- read.csv('C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_1\\HISTORY - Rumination ALL.csv')
+
+df.1.rumination.grouped <- 
+    subset(df.1.rumination,!is.na('Rumination.Minutes')) %>%
+    group_by(Date) %>%
+    summarise('Mean_Milk_Yield' = mean(Rumination.Minutes, na.rm = TRUE))
+  #Farm 2 Plot
+
+  plot_ly(subset(df.1.rumination.grouped,Date>as.Date("2022-11-01")), x = ~Date) %>%
+    add_trace(y = ~Mean_Milk_Yield, type= 'scatter', mode='lines') %>%
+    add_trace(x = as.Date("2022-11-11"), y=c(450,550), type='scatter', mode='lines') %>%
+    add_trace(x = as.Date("2022-11-30"), y=c(450,550), type='scatter', mode='lines') %>%
+    add_trace(x = as.Date("2022-12-14"), y=c(450,550), type='scatter', mode='lines') %>%
+    add_trace(x = as.Date("2023-02-01"), y=c(450,550), type='scatter', mode='lines')
+```
+
+```{r}
+df.2 <- read.csv('C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_2\\test_out_merged.csv')
+df.2 <- df.2 %>% mutate(Date = as.Date(Date, format = "%m/%d/%Y")) 
+#mutate(Date_Time = as_datetime(Date_Time, format = '%Y-%m-%d %h:%m:%s'))
+```
+
+```{r}
+feed.df.2
+feed.list <- as.Date(c("2022-11-11", "2022-11-30", "2022-12-14", "2023-02-01"))
+
+df.2$Date
+df.2 <- df.2 %>% mutate(Feed_Category = case_when(Date >= feed.list[1] ~ 1,
+                                    Date >= feed.list[2] ~ 2,
+                                    Date >= feed.list[3] ~ 3,
+                                    Date >= feed.list[4] ~ 4
+                                    ))
+table(df.2$Feed_Category)
+
+table(df.2$Date)
+
+subset(df.2, Date >= '2022-11-11')
+
+yield.1 <- subset(df.2, Date < '2022-11-11')$Milk_Yield
+yield.2 <- subset(df.2, Date >= '2022-11-11' & Date < '2022-11-30')$Milk_Yield
+yield.3 <- subset(df.2, Date >= '2022-11-30' & Date < '2022-12-14')$Milk_Yield
+yield.4 <- subset(df.2, Date >= '2022-12-14' & Date < '2023-02-01')$Milk_Yield
+yield.5 <- subset(df.2, Date >= '2023-02-01')$Milk_Yield
+
+plot_ly(x = yield.1, type='histogram')
+plot_ly(x = yield.2, type='histogram')
+plot_ly(x = yield.3, type='histogram')
+plot_ly(x = yield.4, type='histogram')
+plot_ly(x = yield.5, type='histogram')
+```
+
+t-tests
+```{r}
+t.test(yield.1,yield.2)
+t.test(yield.2,yield.3)
+t.test(yield.3,yield.4)
+t.test(yield.4,yield.5)
+```
+
+```{r}
+over_time_change <- function(df,variable.name,date.of.change){
+  date.of.change <- as.Date(date.of.change)
+  results = data.frame(matrix(ncol=4,nrow=0))
+  colnames(results) <- c('days_from_change','p_value','before_mean','after_mean')
+  for(i in 1:7){
+    before.date <- as.Date(date.of.change) - i
+    after.date <- as.Date(date.of.change) + i
+    before.values <- subset(df, Date < date.of.change & Date >= before.date)[variable.name]
+    after.values <- subset(df, Date > date.of.change & Date <= after.date)[variable.name]
+    single.results <- t.test(before.values,after.values)
+    results[i,] <- list(i,
+                  single.results$p.value,
+                  single.results$estimate[1],
+                  single.results$estimate[2])
+  }
+  return(results)
+}
+```
+Farm 1
+```{r}
+sort(unique(feed.df.1$Date))
+```
+```{r}
+df.1
+```
+
+```{r}
+df.1.rumination
+variable.name <- "Rumination.Minutes"
+df <- subset(df.1.rumination,!is.na(variable.name))
+df
+min.val <- min(df[variable.name],na.rm=TRUE)
+max.val <- max(df[variable.name],na.rm=TRUE)
+
+plot_ly(df, x = ~Date) %>%
+  add_trace(y = ~Rumination.Minutes, type= 'scatter', mode='lines') %>%
+  add_trace(x = as.Date("2022-11-11"), y=c(min.val,max.val), type='scatter', mode='lines') %>%
+  add_trace(x = as.Date("2022-12-16"), y=c(min.val,max.val), type='scatter', mode='lines') %>%
+  add_trace(x = as.Date("2023-01-04"), y=c(min.val,max.val), type='scatter', mode='lines') %>%
+  add_trace(x = as.Date("2023-02-14"), y=c(min.val,max.val), type='scatter', mode='lines')
+```
+```{r}
+over_time_change(df.1.rumination,"Rumination.Minutes","2023-01-04")
+```
+```{r}
+over_time_change(df.1,"Milk.Yield","2023-01-04")
+```
+```{r}
+#Sanity Check
+over_time_change(df.1,"Milk.Yield","2023-01-15")
+```
+Farm 2
+```{r}
+sort(unique(feed.df.2$Date))
+df.2
+```
+
+```{r}
+df.2
+over_time_change(df.2,"Milk_Yield","2022-11-11")
+```
+```{r}
+over_time_change(df.2,"Milk_Yield","2022-11-30")
+```
+```{r}
+over_time_change(df.2,"Milk_Yield","2022-12-14")
+```
+```{r}
+over_time_change(df.2,"Milk_Yield","2023-02-01")
+```
+Sanity Check
+```{r}
+over_time_change(df.2,"Milk_Yield","2022-11-15")
+over_time_change(df.2,"Milk_Yield","2022-12-07")
+over_time_change(df.2,"Milk_Yield","2023-01-15")
+```

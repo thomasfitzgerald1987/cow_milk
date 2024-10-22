@@ -1,0 +1,60 @@
+﻿Index,var_name,type,analysis_category,model_category,join,model_predictor,na_handling,scaling,Examples,Description
+0,Farm,object,index,remove,1,0,,,"Farm_1, Farm_2, Farm_3",Farm data originates from
+1,Date,datetime64[ns],index,remove,1,0,,normalize,4/2/2023,yyyy-mm-dd
+2,Date_Time,datetime64[ns],index,predictor,0,1,,normalize,4/2/2023 0:00,DateTime yyyy-mm-dd hh:mm:ss
+3,Event_Type,object,index,remove,0,0,,none,"Milking, Alert",Type of event described in the row.
+4,Device_Type,object,index,remove,0,0,,none,AMS_Device,Which type of AMS system is being used.
+5,Animal_Number,int64,index,remove,1,0,,none,5763,Identifier for cow.
+6,Address,int64,index,predictor,0,1,,none,110,Identifier for AMS machine.
+7,Index,object,milking,predictor,0,1,,exclusion,2023-04-024140,"yyyy-mm-dd####, where #### is cow number"
+8,Last_Milking_Interval,float64,milking,predictor,0,1,mode,standardize,,Number of seconds since the last time cow approached AMS.
+9,Milkings,float64,milking,predictor,0,1,0,normalize,,Number of times cow has successfully been milked at AMS that day.
+10,Milk_Yield,float64,milking,predictor,0,1,0,normalize,,Milk extracted (in lbs)
+11,Milk_Yield_Expected,float64,milking,predictor,0,1,0,normalize,,Expected milk to be extracted (in lbs.)
+12,Milk_Yield_Dif,float64,milking,predictor,0,1,0,normalize,,Difference between yield and expected (lbs.)
+13,Lactation_Days,float64,milking,predictor,0,1,mode,normalize,,Number of days cow has been lactating.  Should be between 1-~300ish.
+14,Lactation_Number,float64,milking,predictor,0,1,mode,normalize,,Number of times cow has lactated.  Expect 1- ~7.
+15,Total_Eating_Minutes,float64,milking,predictor,0,1,0,normalize,,Times in minutes cow spent eating.
+16,Rumination_Minutes,float64,milking,predictor,0,1,0,normalize,,Time in minutes cow spent ruminating (chewing previously eaten food.)
+17,Total_Intake_Robot_Feed_1,float64,milking,predictor,0,1,0,normalize,,
+18,Total_Intake_Robot_Feed_2,float64,milking,predictor,0,1,0,normalize,,
+19,Rest_Feed_Robot_Feed_1,float64,milking,predictor,0,1,0,normalize,,
+20,Rest_Feed_Robot_Feed_2,float64,milking,predictor,0,1,0,normalize,,
+21,Alarm_Description,object,ams,ams,0,0,,,,
+22,Alarm_Indication_ID,float64,ams,ams,0,0,,,,
+23,Alarm_Type,object,ams,ams,0,0,,,,
+24,Failure,object,ams,ams,0,0,,,,AMS Device failed.
+25,Seperation,int64,ams,ams,0,0,,binary,,AMS device came unclamped from cow (often from kicking/moving too much)
+26,Downtime,float64,ams,ams,0,0,,normalize,,Time in seconds since AMS device was last active
+27,Milk_Speed,float64,ams,ams,0,0,,normalize,,
+28,Box_Time,float64,ams,ams,0,0,,standardize,,Time in seconds cow was in AMS device
+29,Milk_Time,float64,ams,ams,0,0,,,,Time in seconds cow was milked
+30,Refusal_Type_Milk_Visit,int64,ams,ams,0,0,,binary,,Cow allowed into AMS for milking
+31,Refusal_Type_Milk_Interval_Not_Passed,int64,ams,ams,0,0,,binary,,Cow refused due to visiting too quickly
+32,Refusal_Type_Other,int64,ams,ams,0,0,,binary,,Cow refused for other reason
+33,Visit_Result_Successful,int64,ams,ams,0,0,,binary,,Cow successfully milked
+34,Visit_Result_Milk_Interval_not_Passed,int64,ams,ams,0,0,,binary,,Cow refused due to visiting too quickly
+35,Visit_Result_Other,int64,ams,ams,0,0,,binary,,Visit result other 
+36,filename,object,,remove,,,,,,
+37,Animal_Tag_Id,float64,,remove,,,,,,
+38,Chews_per_Bolus,float64,,remove,,,,,,
+39,Current_Lactation,object,,remove,,,,binary,,
+40,Total_Robot_Feed_1,float64,,remove,,,,,,
+41,Total_Robot_Feed_2,float64,,remove,,,,,,
+42,Refusal_Type,object,,remove,,,,,,
+43,Visit_Result,object,,remove,,,,,,
+44,Haylage_Dry_Matter,float64,response,response,0,0,median,exclusion,51.25,Dry Matter present in Haylage
+45,Haylage_Lignin,float64,response,response,0,0,median,exclusion,3.26,Lignin present in Haylage
+46,Haylage_Starch,float64,response,response,0,0,median,exclusion,26.38,Starch present in Haylage
+47,Haylage_CP,float64,response,response,0,0,median,exclusion,15.57,Crude protein present in Haylage
+48,Haylage_aNDFom,float64,response,response,0,0,median,exclusion,27.34,aNDFom(fiber) present in Haylage
+49,PMR_Dry_Matter,float64,response,response,0,0,median,exclusion,51.25,Dry Matter present in PMR
+50,PMR_Lignin,float64,response,response,0,0,median,exclusion,3.26,Lignin present in PMR
+51,PMR_Starch,float64,response,response,0,0,median,exclusion,26.38,Starch present in PMR
+52,PMR_CP,float64,response,response,0,0,median,exclusion,15.57,Crude protein present in PMR
+53,PMR_aNDFom,float64,response,response,0,0,median,exclusion,27.34,aNDFom(fiber) present in PMR
+54,Corn_Dry_Matter,float64,response,response,0,0,median,exclusion,51.25,Dry Matter present in Corn
+55,Corn_Lignin,float64,response,response,0,0,median,exclusion,3.26,Lignin present in Corn
+56,Corn_Starch,float64,response,response,0,0,median,exclusion,26.38,Starch present in Corn
+57,Corn_CP,float64,response,response,0,0,median,exclusion,15.57,Crude protein  present in Corn
+58,Corn_aNDFom,float64,response,response,0,0,median,exclusion,27.34,aNDFom(fiber) present in Corn

@@ -1,0 +1,16 @@
+﻿var_name,Type,Examples,Description
+Haylage_Dry_Matter,float64,51.25,Dry Matter present in Haylage
+Haylage_Lignin,float64,3.26,Lignin present in Haylage
+Haylage_Starch,float64,26.38,Starch present ch Haylage
+Haylage_CP,float64,15.57,CP present in Haylage
+Haylage_aNDFom,float64,27.34,aNDFom present in Haylage
+PMR_Dry_Matter,float64,51.25,Dry Matter present in PMR
+PMR_Lignin,float64,3.26,Lignin present in PMR
+PMR_Starch,float64,26.38,Starch present in PMR
+PMR_CP,float64,15.57,CP present in PMR
+PMR_aNDFom,float64,27.34,aNDFom present in PMR
+Corn_Dry_Matter,float64,51.25,Dry Matter present in Corn
+Corn_Lignin,float64,3.26,Lignin present in Corn
+Corn_Starch,float64,26.38,Starch present in Corn
+Corn_CP,float64,15.57,CP present in Corn
+Corn_aNDFom,float64,27.34,aNDFom present in Corn

@@ -1,0 +1,690 @@
+---
+title: "lactation_curves"
+author: "Thomas FitzGerald"
+date: "2023-07-13"
+output: html_document
+---
+
+In this test, we're going to be setting up some visualizations for milk curves, meaning the milk output of cows from calving to when they stop producing.
+
+```{r setup, include=FALSE}
+library(readxl)
+library(dplyr)
+library(stringr)
+library(lubridate)
+library(zoo)
+
+library(plotly)
+library(ggplot2)
+```
+
+We'll start with the test Farm 1 output, since that's currently our most complete dataset.
+```{r}
+df.raw <- read.csv('C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_1\\test\\test_out_merged.csv')
+```
+
+```{r}
+df <- df.raw
+df
+```
+
+First, let's filter out all the rows we don't need.  We'll use Animal #4140 has a test case.
+```{r}
+df <-subset(df,!is.na(Milk_Yield))
+df$Date <- as.Date(df$Date)
+subset(df,Farm=='Farm_1' & Animal_Number==4140)
+```
+
+While examining this subset to determine which variables we'll still need, I ran into a few oddities.  First, we have 612 milkings of animals that are listed as Current_Lactation='False', where they produced milk.:
+```{r}
+subset(df,Current_Lactation=='False')
+unique(subset(df,Current_Lactation=='False')$Animal_Number)
+```
+We should check this out later.
+
+Next, we're going to group by Farm,Date, and Animal Number.  We're obviously going to need milk_yield, but we're also going to keep expected milk yield and lactation number.  
+```{r}
+df.1.grouped <- 
+  df %>% #This should maybe be converting to 0 instead.  I _think_ they are all non-milking rows, though.
+  arrange(df,Farm,Animal_Number,Date,Lactation_Days) %>% 
+  group_by(Farm,Animal_Number,Date,Lactation_Days) %>%
+  summarise('Milk_Yield' = sum(Milk_Yield),
+            'Milk_Yield_Expected' = sum(Milk_Yield_Expected),
+            'Lactation_Number' = mean(Lactation_Number))
+
+df.1.grouped
+```
+Next, we will graph the milk_yield of this cow by date.
+
+```{r}
+df.graph <- subset(df.1.grouped,Farm=='Farm_1' & Animal_Number==4140)
+df.graph$Date <- as.Date(df.graph$Date)
+
+plot_ly(df.graph, x = ~Date) %>%
+  add_trace(y = ~Milk_Yield, type= 'scatter')
+```
+
+As we can see from our test case, there is a lot of day-to-day variance.  To make this a little more comprehensible, we're going to try both a 3-day and 7-day average, instead of actual day values.  We'll use cow 4140 as our first test.
+
+```{r}
+df.graph <- subset(df.1.grouped,Farm=='Farm_1' & Animal_Number==4140)
+df.graph$Date <- as.Date(df.graph$Date)
+
+df.graph$three_day <- rollmeanr(df.graph$Milk_Yield,k=3,fill=NA)
+df.graph$seven_day <- rollmeanr(df.graph$Milk_Yield,k=7,fill=NA)
+
+plot_ly(df.graph, x = ~Date) %>%
+  add_trace(y = ~Milk_Yield, type= 'scatter', mode='line') %>%
+  add_trace(y = ~three_day, type= 'scatter', mode='line') %>%
+  add_trace(y = ~seven_day, type= 'scatter', mode='line')
+```
+Using a rolling average makes this slightly more comprehensible, but there's still a huge gap for most of May.  The increase in April also seems somewhat inexplicable.  Let's try again with another cow.
+
+```{r}
+df.graph <- subset(df.1.grouped,Farm=='Farm_1' & Animal_Number==5703)
+df.graph$Date <- as.Date(df.graph$Date)
+
+df.graph$three_day <- rollmeanr(df.graph$Milk_Yield,k=3,fill=NA)
+df.graph$seven_day <- rollmeanr(df.graph$Milk_Yield,k=7,fill=NA)
+
+plot_ly(df.graph, x = ~Date) %>%
+  add_trace(y = ~Milk_Yield, type= 'scatter', mode='line') %>%
+  add_trace(y = ~three_day, type= 'scatter', mode='line') %>%
+  add_trace(y = ~seven_day, type= 'scatter', mode='line')
+
+```
+
+We could, instead, graph by days in milk.
+
+```{r}
+df.graph <- subset(df.1.grouped,Farm=='Farm_1' & Animal_Number==5703)
+
+df.graph$three_day <- rollmeanr(df.graph$Milk_Yield,k=3,fill=NA)
+df.graph$seven_day <- rollmeanr(df.graph$Milk_Yield,k=7,fill=NA)
+
+plot_ly(df.graph, x = ~Lactation_Days) %>%
+  add_trace(y = ~Milk_Yield, type= 'scatter', mode='line') %>%
+  add_trace(y = ~three_day, type= 'scatter', mode='line') %>%
+  add_trace(y = ~seven_day, type= 'scatter', mode='line')
+```
+
+There's a strange jump in production around day 270 for this cow.  Let's try a few more:
+
+
+
+```{r}
+single_animal_graph <- function(grouped_df,farm_name,animal_number){
+
+df.graph <- subset(grouped_df,Farm==farm_name & Animal_Number==animal_number)
+
+df.graph$three_day <- rollmeanr(df.graph$Milk_Yield,k=3,fill=NA)
+df.graph$seven_day <- rollmeanr(df.graph$Milk_Yield,k=7,fill=NA)
+
+plot_ly(df.graph, x = ~Lactation_Days) %>%
+    add_trace(y = ~Milk_Yield, type= 'scatter', mode='line') %>%
+    add_trace(y = ~three_day, type= 'scatter', mode='line') %>%
+    add_trace(y = ~seven_day, type= 'scatter', mode='line')
+}
+```
+
+```{r}
+head(unique(df.1.grouped$Animal_Number))
+single_animal_graph(df.1.grouped,'Farm_1',4140)
+single_animal_graph(df.1.grouped,'Farm_1',4153)
+single_animal_graph(df.1.grouped,'Farm_1',4429)
+single_animal_graph(df.1.grouped,'Farm_1',4432)
+single_animal_graph(df.1.grouped,'Farm_1',4467)
+single_animal_graph(df.1.grouped,'Farm_1',4467)
+```
+
+It looks to me like there's no discernable curve to these animals' milk production.  Maybe we need to look only at animals that are newly in milk:
+
+```{r}
+animal.list.new <- unique(subset(df.1.grouped,Lactation_Days == 1)$Animal_Number)
+subset(df.1.grouped,Animal_Number==animal.list.new[2])
+```
+
+```{r}
+single_animal_graph(subset(df.1.grouped,Lactation_Days < 100),'Farm_1',animal.list.new[1])
+single_animal_graph(subset(df.1.grouped,Lactation_Days < 100),'Farm_1',animal.list.new[2])
+single_animal_graph(subset(df.1.grouped,Lactation_Days < 100),'Farm_1',animal.list.new[3])
+single_animal_graph(subset(df.1.grouped,Lactation_Days < 100),'Farm_1',animal.list.new[4])
+single_animal_graph(subset(df.1.grouped,Lactation_Days < 100),'Farm_1',animal.list.new[5])
+```
+
+There are a lot of 'new' animal_numbers in June.  Did they re-code?  Let's check 5079.
+
+```{r}
+arrange(subset(df,Animal_Number==5079),Date)
+df.early <- subset(df,Animal_Number==5079,Date < "2023-05-01")
+df.early$Date[50] < "2023-05-01"
+df.late <- subset(df,Animal_Number==5079,Date>2023-05-01)
+
+
+df.early
+```
+```{r}
+df.late
+```
+
+```{r}
+df.graph <- subset(df.1.grouped,Farm=='Farm_1')
+
+df.graph$seven_day <- rollmeanr(df.graph$Milk_Yield,k=7,fill=NA)
+
+plot_ly(df.graph, x = ~Lactation_Days) %>%
+    add_trace(y = ~seven_day, type= 'scatter')
+```
+
+Well, farm 1 was kind of a bust.  Let's try farm 2:
+
+```{r}
+df.raw <- read.csv('C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_2\\test\\milk_merged.csv')
+df <- df.raw
+df
+```
+
+
+First, let's filter out all the rows we don't need.
+```{r}
+df <-subset(df,!is.na(Milk_Yield))
+df$Date <- as.Date(df$Date)
+subset(df,Farm=='Farm_2' & Animal_Number==2)
+```
+
+```{r}
+df.2.grouped <- 
+  df %>% #This should maybe be converting to 0 instead.  I _think_ they are all non-milking rows, though.
+  arrange(df,Farm,Animal_Number,Date,Lactation_Days) %>% 
+  group_by(Farm,Animal_Number,Date,Lactation_Days) %>%
+  summarise('Milk_Yield' = sum(Milk_Yield),
+            'Milk_Yield_Expected' = sum(Milk_Yield_Expected),
+            'Lactation_Number' = mean(Lactation_Number))
+```
+```{r}
+single_animal_graph(df.2.grouped,'Farm_2',2)
+```
+
+Finally, results that actually look like a lactation curve.  Now we need to find a quick way to apply the 7 day average to our entire dataset.  Unfortunately, the best option I could come up with is a for loop with subsetting and rollmean().
+
+```{r}
+df.grouped <- 
+  df %>% #This should maybe be converting to 0 instead.  I _think_ they are all non-milking rows, though.
+  arrange(df,Farm,Animal_Number,Date,Lactation_Days) %>% 
+  group_by(Farm,Animal_Number,Date,Lactation_Days) %>%
+  summarise('Milk_Yield' = sum(Milk_Yield),
+            'Milk_Yield_Expected' = sum(Milk_Yield_Expected),
+            'Lactation_Number' = mean(Lactation_Number))
+
+smoothing <- 7
+farm_name <- 'Farm_2'
+rm(df.output)
+
+for(farm_name in unique(df.grouped$Farm)){
+  for(animal in unique(df.grouped$Animal_Number)){
+    if(exists("df.output")){
+      df.temp <- subset(df.grouped,Farm==farm_name & Animal_Number==animal)
+      df.temp$smoothed_yield <- rollmeanr(df.temp$Milk_Yield,k=smoothing,fill=NA)
+      df.output <- rbind(df.output,df.temp)
+    } else {
+      df.output <- df.temp
+    }
+  }
+}
+
+df.output$smoothed_yield[which(is.na(df.output$smoothed_yield))] <- df.output$Milk_Yield[which(is.na(df.output$smoothed_yield))]
+
+df.output
+
+```
+
+Now that we have a usable dataset with all animals, let's try visualizing it.
+```{r}
+df.graph <- df.output
+df.graph <- subset(df.output,Lactation_Number==6)
+
+plot_ly(df.graph, x = ~Lactation_Days) %>%
+  add_trace(y = ~Milk_Yield, type= 'scatter', mode='line') %>%
+  add_trace(y = ~smoothed_yield, type= 'scatter', mode='line')
+```
+
+This works OK for a small number of animals, but not for larger numbers.  Let's try assembling the data again, but use entire lactation_number groupings.  That way we'll only have ~6 sets for Farm 2.
+
+```{r}
+df.grouped <- 
+  df %>% #This should maybe be converting to 0 instead.  I _think_ they are all non-milking rows, though.
+  arrange(df,Lactation_Number,Lactation_Days) %>% 
+  group_by(Farm,Lactation_Number,Lactation_Days) %>%
+  summarise('Milk_Yield' = sum(Milk_Yield),
+            'Milk_Yield_Expected' = sum(Milk_Yield_Expected))
+
+smoothing <- 7
+farm_name <- 'Farm_2'
+rm(df.output)
+
+for(farm_name in unique(df.grouped$Farm)){
+  print(farm_name)
+  for(i in unique(df.grouped$Lactation_Number)){
+    if(exists("df.output")){
+      print(i)
+      df.temp <- subset(df.grouped,Farm==farm_name & Lactation_Number==i)
+      df.temp$smoothed_yield <- rollmeanr(df.temp$Milk_Yield,k=smoothing,fill=NA)
+      df.output <- rbind(df.output,df.temp)
+    } else {
+      df.output <- df.temp
+    }
+  }
+}
+
+df.output$smoothed_yield[which(is.na(df.output$smoothed_yield))] <- df.output$Milk_Yield[which(is.na(df.output$smoothed_yield))]
+
+df.output
+```
+```{r}
+df.graph <- df.output
+plot_ly(df.graph, x = ~Lactation_Days, split= ~Lactation_Number) %>%
+  add_trace(y = ~smoothed_yield, type= 'scatter', mode='line')
+```
+
+Now we look like we've got a proper graph.  However, smoothed_yield is not showing what we're expecting: I think that's the total yield per group, and the fall off is more due to fewer cows (there are only 3 cows in group 6, for example).  Also, it's odd that there's no 'Lactation_Number==1' in there.
+
+Side note: Some of the above had Lactation_Days AND Date as groupings, which caused duplicates further down the line.  Make sure to only do one or the other.
+
+Next, let's figure out how smoothed_yield got screwed up.
+
+In the code below, we're grouping by lactation_number and days, and then getting the sum.  What we actually want is to sum each day by animal, then get the MEAN yield of all animals on that day.  Also, we want to group by Lactation_Number when getting those sums, to avoid duplicates of each animal.
+
+Original:
+```{r}
+df.grouped <- 
+  df %>%
+  arrange(df,Lactation_Number,Lactation_Days) %>% 
+  group_by(Farm,Lactation_Number,Lactation_Days) %>%
+  summarise('Milk_Yield' = sum(Milk_Yield),
+            'Milk_Yield_Expected' = sum(Milk_Yield_Expected))
+```
+
+First, we get the daily sum for each animal:
+```{r}
+df %>%
+  arrange(df,Farm,Lactation_Number,Animal_Number,Lactation_Days) %>%
+  group_by (Farm,Lactation_Number,Animal_Number,Lactation_Days) %>%
+  summarise('Daily_Milk_Yield' = sum(Milk_Yield),
+            'Daily_Milk_Yield_Expected' = sum(Milk_Yield_Expected))
+```
+
+Next, we group that into a daily average for each lactation_number.
+```{r}
+df.grouped <- df %>%
+  arrange(df,Farm,Lactation_Number,Animal_Number,Lactation_Days) %>%
+  #Animal Sum
+  group_by (Farm,Lactation_Number,Animal_Number,Lactation_Days) %>%
+  summarise('Daily_Milk_Yield' = sum(Milk_Yield),
+            'Daily_Milk_Yield_Expected' = sum(Milk_Yield_Expected)) %>%
+  #Daily Average
+  group_by(Farm,Lactation_Number,Lactation_Days) %>%
+  summarise('Daily_Milk_Yield_Mean' = mean(Daily_Milk_Yield),
+            'Daily_Milk_Yield_Expected_Mean' = mean(Daily_Milk_Yield_Expected))
+```
+Now we can re-apply smoothing and try graphing again.  Also fixed an issue with the looping.
+```{r}
+smoothing <- 7
+farm_name <- 'Farm_2'
+rm(df.output)
+
+for(farm_name in unique(df.grouped$Farm)){
+  print(farm_name)
+  for(i in unique(df.grouped$Lactation_Number)){
+      print(i)
+      df.temp <- subset(df.grouped,Farm==farm_name & Lactation_Number==i)
+      df.temp$smoothed_yield <- rollmeanr(df.temp$Daily_Milk_Yield_Mean,k=smoothing,fill=NA)
+    if(exists("df.output")){
+      df.output <- rbind(df.output,df.temp)
+    } else {
+      df.output <- df.temp
+    }
+  }
+}
+
+df.output$smoothed_yield[which(is.na(df.output$smoothed_yield))] <- df.output$Daily_Milk_Yield_Mean[which(is.na(df.output$smoothed_yield))]
+
+df.graph <- df.output
+
+View(df.graph)
+plot_ly(df.graph, x = ~Lactation_Days, split= ~Lactation_Number) %>%
+  add_trace(y = ~smoothed_yield, type= 'scatter', mode='line')
+
+```
+
+Alright, now we can a functional graph.  Let's double-check the values being returned by smoothed_yield, using Lactation_Number 6, since there are a smaller number of cows.
+
+Lactation_Number 6, day 31 is returning ~156 for smoothed yield.
+```{r}
+select(subset(df,Lactation_Number==6&Lactation_Days==31), Farm,Lactation_Number,Animal_Number,Lactation_Days,Milk_Yield)
+```
+```{r}
+sum(subset(df,Lactation_Number==6&Lactation_Days==31&Animal_Number==839)$Milk_Yield)
+sum(subset(df,Lactation_Number==6&Lactation_Days==31&Animal_Number==917)$Milk_Yield)
+```
+
+Rolled in with the previous days, that our value of 156 seems reasonable.
+
+Now, let's do a quick check on farm 3's data:
+
+```{r}
+df.raw <- read.csv('C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_3\\test\\milk_merged.csv')
+df <- df.raw
+df <-subset(df,!is.na(Milk_Yield))
+df$Date <- as.Date(df$Date)
+
+subset(df,Farm=='Farm_3' & Animal_Number==531)
+```
+
+We don't currently have expected milk yields for Farm #3, so we're omitting that part.
+```{r}
+df.grouped <- df %>%
+  arrange(df,Farm,Lactation_Number,Animal_Number,Lactation_Days) %>%
+  #Animal Sum
+  group_by (Farm,Lactation_Number,Animal_Number,Lactation_Days) %>%
+  summarise('Daily_Milk_Yield' = sum(Milk_Yield)) %>%
+  #Daily Average
+  group_by(Farm,Lactation_Number,Lactation_Days) %>%
+  summarise('Daily_Milk_Yield_Mean' = mean(Daily_Milk_Yield))
+```
+
+```{r}
+smoothing <- 7
+farm_name <- 'Farm_3'
+rm(df.output)
+
+for(farm_name in unique(df.grouped$Farm)){
+  print(farm_name)
+  for(i in unique(df.grouped$Lactation_Number)){
+      print(i)
+      df.temp <- subset(df.grouped,Farm==farm_name & Lactation_Number==i)
+      df.temp$smoothed_yield <- rollmeanr(df.temp$Daily_Milk_Yield_Mean,k=smoothing,fill=NA)
+    if(exists("df.output")){
+      df.output <- rbind(df.output,df.temp)
+    } else {
+      df.output <- df.temp
+    }
+  }
+}
+
+df.output$smoothed_yield[which(is.na(df.output$smoothed_yield))] <- df.output$Daily_Milk_Yield_Mean[which(is.na(df.output$smoothed_yield))]
+
+df.graph <- df.output
+
+View(df.graph)
+plot_ly(df.graph, x = ~Lactation_Days, split= ~Lactation_Number) %>%
+  add_trace(y = ~smoothed_yield, type= 'scatter', mode='line')
+```
+
+Success!
+
+Now, let's see if we can roll all of that into a single dataframe, to do farm VS farm comparisons:
+
+```{r}
+dir.list <- c('C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_1\\test\\',
+              'C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_2\\test\\',
+              'C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_3\\test\\')
+
+df.full <- NULL
+for(i in dir.list){
+  df <- read.csv(paste(i,'milk_merged.csv',sep=''))
+  df <-subset(df,!is.na(Milk_Yield))
+  df$Date <- as.Date(df$Date)
+  df <- select(df,
+       c(Farm,
+         Date,
+         Date_Time,
+         Animal_Number,
+         Lactation_Number,
+         Lactation_Days,
+         Milk_Yield)
+       )
+  df.full <- rbind(df.full,df)
+}
+
+
+
+table(df.full$Farm)
+```
+```{r}
+df.grouped <- df.full %>%
+  arrange(Farm,Lactation_Number,Animal_Number,Lactation_Days) %>%
+  #Animal Sum
+  group_by (Farm,Lactation_Number,Animal_Number,Lactation_Days) %>%
+  summarise('Daily_Milk_Yield' = sum(Milk_Yield)) %>%
+  #Daily Average
+  group_by(Farm,Lactation_Number,Lactation_Days) %>%
+  summarise('Daily_Milk_Yield_Mean' = mean(Daily_Milk_Yield))
+
+df.grouped$Lactation_Number <- paste(df.grouped$Farm,df.grouped$Lactation_Number,sep='_')
+table(df.grouped$Lactation_Number)
+```
+
+```{r}
+smoothing <- 7
+df.output <- NULL
+
+for(farm_name in unique(df.grouped$Farm)){
+  print(farm_name)
+  for(i in unique(df.grouped$Lactation_Number)){
+      print(i)
+      df.temp <- subset(df.grouped,Farm==farm_name & Lactation_Number==i)
+      df.temp$smoothed_yield <- rollmeanr(df.temp$Daily_Milk_Yield_Mean,k=smoothing,fill=NA)
+    if(exists("df.output")){
+      df.output <- rbind(df.output,df.temp)
+    } else {
+      df.output <- df.temp
+    }
+  }
+}
+
+df.output$smoothed_yield[which(is.na(df.output$smoothed_yield))] <- df.output$Daily_Milk_Yield_Mean[which(is.na(df.output$smoothed_yield))]
+
+df.graph <- df.output
+
+View(df.graph)
+plot_ly(df.graph, x = ~Lactation_Days, split= ~Lactation_Number) %>%
+  add_trace(y = ~smoothed_yield, 
+            type= 'scatter', 
+            mode='line',
+        colors = c('lightgoldenrod', 'lightgoldenrod2','goldenrod','goldenrod2','darkgoldenrod','darkgoldenrod2','darkgoldenrod4',
+                   'lightblue','lightblue2','lightblue4','dodgerblue1','dodgerblue3','dodgerblue4','darkblue',
+                   'tomato','tomato2','orangered1','orangered2','red','red3','darkred'),
+        color = ~ Lactation_Number) %>%
+        layout(title = 'Average Milk Output by Lactation Number',
+               xaxis = list(title = 'Day of Lactation',
+                            range = c(0,365)),
+               yaxis = list(title = 'Average Milk Yield'))
+```
+Functionalized versions of above:
+```{r}
+
+get.milking.data <- function(dir.list){
+
+df.full <- NULL
+  for(i in dir.list){
+    df <- read.csv(paste(i,'milk_merged.csv',sep=''))
+    df <-subset(df,!is.na(Milk_Yield))
+    df$Date <- as.Date(df$Date)
+    df <- select(df,
+         c(Farm,
+           Date,
+           Date_Time,
+           Animal_Number,
+           Lactation_Number,
+           Lactation_Days,
+           Milk_Yield)
+         )
+    df.full <- rbind(df.full,df)
+  }
+  return(df.full)
+}
+  
+group.by.date <- function(df.full){
+  smoothing <- 7
+  df.output <- NULL
+  df.grouped <- df.full %>%
+    arrange(Farm,Lactation_Number,Animal_Number,Date) %>%
+    #Animal Sum
+    group_by (Farm,Lactation_Number,Animal_Number,Date) %>%
+    summarise('Daily_Milk_Yield' = sum(Milk_Yield)) %>%
+    #Daily Average
+    group_by(Farm,Lactation_Number,Date) %>%
+    summarise('Daily_Milk_Yield_Mean' = mean(Daily_Milk_Yield))
+  
+  #df.grouped$Lactation_Number <- paste(df.grouped$Farm,df.grouped$Lactation_Number,sep='_')
+  
+  
+  for(farm_name in unique(df.grouped$Farm)){
+    for(i in unique(df.grouped$Lactation_Number)){
+        df.temp <- subset(df.grouped,Farm==farm_name & Lactation_Number==i)
+        df.temp$smoothed_yield <- rollmeanr(df.temp$Daily_Milk_Yield_Mean,k=smoothing,fill=NA)
+      if(exists("df.output")){
+        df.output <- rbind(df.output,df.temp)
+      } else {
+        df.output <- df.temp
+      }
+    }
+  }
+  
+  df.output$smoothed_yield[which(is.na(df.output$smoothed_yield))] <- df.output$Daily_Milk_Yield_Mean[which(is.na(df.output$smoothed_yield))]
+  return(df.output)
+}
+
+group.by.days <- function(df.full){
+  smoothing <- 7
+  df.output <- NULL
+    df.grouped <- df.full %>%
+    arrange(Farm,Lactation_Number,Animal_Number,Lactation_Days) %>%
+    #Animal Sum
+    group_by (Farm,Lactation_Number,Animal_Number,Lactation_Days) %>%
+    summarise('Daily_Milk_Yield' = sum(Milk_Yield)) %>%
+    #Daily Average
+    group_by(Farm,Lactation_Number,Lactation_Days) %>%
+    summarise('Daily_Milk_Yield_Mean' = mean(Daily_Milk_Yield))
+  
+  #df.grouped$Lactation_Number <- paste(df.grouped$Farm,df.grouped$Lactation_Number,sep='_')
+  
+  for(farm_name in unique(df.grouped$Farm)){
+    for(i in unique(df.grouped$Lactation_Number)){
+        df.temp <- subset(df.grouped,Farm==farm_name & Lactation_Number==i)
+        df.temp$smoothed_yield <- rollmeanr(df.temp$Daily_Milk_Yield_Mean,k=smoothing,fill=NA)
+      if(exists("df.output")){
+        df.output <- rbind(df.output,df.temp)
+      } else {
+        df.output <- df.temp
+      }
+    }
+  }
+  
+  df.output$smoothed_yield[which(is.na(df.output$smoothed_yield))] <- df.output$Daily_Milk_Yield_Mean[which(is.na(df.output$smoothed_yield))]
+  return(df.output)
+}
+
+df.graph <- df.output
+
+View(df.graph)
+plot_ly(df.graph, x = ~Date, split= ~Lactation_Number) %>%
+  add_trace(y = ~smoothed_yield, 
+            type= 'scatter', 
+            mode='line',
+        colors = c('lightgoldenrod', 'lightgoldenrod2','goldenrod','goldenrod2','darkgoldenrod','darkgoldenrod2','darkgoldenrod4',
+                   'lightblue','lightblue2','lightblue4','dodgerblue1','dodgerblue3','dodgerblue4','darkblue',
+                   'tomato','tomato2','orangered1','orangered2','red','red3','darkred'),
+        color = ~ Lactation_Number) %>%
+        layout(title = 'Average Milk Output by Date & Lactation Number',
+               xaxis = list(title = 'Day of Lactation',
+                            range = c(0,365)),
+               yaxis = list(title = 'Average Milk Yield'))
+```
+
+This section is for making presentation graphs.
+```{r}
+dir.list <- c('C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_1\\test\\',
+              'C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_2\\test\\',
+              'C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_3\\test\\')
+df.full <- get.milking.data(dir.list)
+#Remove duplicates
+df.full <- distinct(df.full)
+
+df.graph.days <- group.by.days(df.full)
+df.graph.date <- group.by.date(df.full)
+
+farm_name <- 'Farm_2'
+df.graph.date <- subset(df.graph.date,Farm==farm_name&Lactation_Number<=5) %>% mutate(Lactation_Number=as.character(Lactation_Number))
+df.graph.days <- subset(df.graph.days,Farm==farm_name&Lactation_Number<=5) %>% mutate(Lactation_Number=as.character(Lactation_Number))
+
+
+```
+
+```{r}
+plot_ly(df.graph.days, x = ~Lactation_Days, split= ~Lactation_Number) %>%
+  add_trace(y = ~smoothed_yield, 
+            type= 'scatter', 
+            mode='line',
+        colors = c('lightgoldenrod', 'lightgoldenrod2','goldenrod','goldenrod2','darkgoldenrod','darkgoldenrod2','darkgoldenrod4',
+                   'lightblue','lightblue2','lightblue4','dodgerblue1','dodgerblue3','dodgerblue4','darkblue',
+                   'tomato','tomato2','orangered1','orangered2','red','red3','darkred'),
+        color = ~ Lactation_Number) %>%
+        layout(title = 'Average Milk Output by Lactation Number',
+               xaxis = list(title = 'Day of Lactation',
+                            range = c(0,300)),
+               yaxis = list(title = 'Average Milk Yield'))
+
+plot_ly(df.graph.date, x = ~Date, split= ~Lactation_Number) %>%
+  add_trace(y = ~smoothed_yield, 
+            type= 'scatter', 
+            mode='line',
+        colors = c('lightgoldenrod', 'lightgoldenrod2','goldenrod','goldenrod2','darkgoldenrod','darkgoldenrod2','darkgoldenrod4',
+                   'lightblue','lightblue2','lightblue4','dodgerblue1','dodgerblue3','dodgerblue4','darkblue',
+                   'tomato','tomato2','orangered1','orangered2','red','red3','darkred'),
+        color = ~ Lactation_Number) %>%
+        layout(title = 'Average Milk Output by Date & Lactation Number',
+               xaxis = list(title = 'Date'),
+               yaxis = list(title = 'Average Milk Yield'))
+```
+
+```{r}
+df.start.date <- df.full %>%
+  subset(Lactation_Days==1) %>%
+  arrange(Farm,Lactation_Number,Animal_Number,Date) %>%
+  #Animal Sum
+  group_by (Farm,Lactation_Number,Animal_Number,Date) %>%
+  summarise('Daily_Milk_Yield' = 1)
+
+plot_ly(alpha = 0.6)  %>% 
+  add_histogram(data=subset(df.start.date,Farm=='Farm_1'), x = ~Date, name = 'Farm_1') %>%
+  add_histogram(data=subset(df.start.date,Farm=='Farm_2'), x = ~Date, name = 'Farm_2') %>%
+  add_histogram(data=subset(df.start.date,Farm=='Farm_3'), x = ~Date, name = 'Farm_3') %>%
+  layout(barmode="overlay")
+
+```
+
+```{r}
+fig <- plot_ly(df.graph.date, x = ~Date, split= ~Lactation_Number) %>%
+  add_trace(y = ~smoothed_yield, 
+            type= 'scatter', 
+            mode='line',
+        colors = c('lightgoldenrod', 'lightgoldenrod2','goldenrod','goldenrod2','darkgoldenrod','darkgoldenrod2','darkgoldenrod4',
+                   'lightblue','lightblue2','lightblue4','dodgerblue1','dodgerblue3','dodgerblue4','darkblue',
+                   'tomato','tomato2','orangered1','orangered2','red','red3','darkred'),
+        color = ~ Lactation_Number) %>%
+        # layout(title = 'Average Milk Output by Date & Lactation Number',
+        #        xaxis = list(title = 'Day of Lactation',
+        #                     range = c(0,365)),
+        #        yaxis = list(title = 'Average Milk Yield'))
+
+# for(i in df.feed$start_date){
+#   fig <- fig %>%
+#     add_trace(x=as.Date(i),y=70,yend=100, line = list(width=0.5, dash="dot"))
+# }
+
+fig
+  
+  #add_trace(x=as.Date("2023-04-10"),y=100)
+
+```

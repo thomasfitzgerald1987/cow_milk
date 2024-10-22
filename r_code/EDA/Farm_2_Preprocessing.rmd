@@ -1,0 +1,104 @@
+---
+title: "Farm_1_EDA"
+author: "Thomas FitzGerald"
+date: "2023-02-13"
+output: html_document
+---
+
+```{r}
+library(readxl)
+library(dplyr)
+library(plotly)
+library(ggplot2)
+
+library(stringr)
+library(lubridate)
+```
+
+
+Farm 2
+```{r}
+  filenames <- list.files(filepath<-'C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_2\\',
+                          pattern='*.csv',
+                          full.names=TRUE)
+
+for(x in filenames){
+  print(x)
+  #df <-read_excel(path=x) #Rows 1-7 are not part of table.
+}
+
+
+```
+
+Milk and feed
+
+```{r}
+df <- read.csv("C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_2\\3.7.2023 Farm 2 Cow Traffic.csv")
+colnames(df)<-sub(" ","_",colnames(df))
+
+df
+```
+```{r}
+df <- read.csv(path="C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_2\\3.7.2023 Farm 2 Feeding Yearly.csv")
+if(colnames(df)[1]=='Event Time...1'){
+  colnames(df)[1] <- 'Date_Time'
+  df <- df %>% select(-"Event Time...9")
+  colnames(df)<-sub(" ","_",colnames(df))
+}
+
+df
+```
+
+Timezone needs fixing (should be function parameter)
+```{r}
+df <- read.csv(path="C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_2\\Farm 2 milking data 11-11-2022.xlsx")
+if('End Time' %in% colnames(df)){
+  colnames(df)<-str_replace_all(colnames(df)," ","_")
+  df$Begin_Time <- as_datetime(df$Begin_Time, format = "%m/%d/%Y %I:%M %p", tz="CT")
+  df$End_Time <- as_datetime(paste(df$Date, df$End_Time, sep=' '), format = "%m/%d/%Y %I:%M %p", tz="CT") 
+  #End_Time needs adjustment here to cover milkings around midnight
+    df$End_Time <- difftime(df$End_Time,df$Begin_Time,)
+  df$Date <- as_datetime(df$Date,format ="%m/%d/%Y",tz="CT")
+}
+table(df$Incomplete)
+table(df$Kickoff)
+table(df$Not_Milked_Teats)
+df
+```
+
+```{r}
+df <- read.csv('C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_2\\3.7.2023 Farm 2 Yearly.csv',sep=';')
+colnames(df)
+
+if(colnames(df)[1]=='Animal.ID'){
+  colnames(df)<-c('Animal_Number','Current_Group','Lactation_Status','Lactation_Number','Animal_Badge')
+}
+
+df
+
+df$Not_Milked_Bool <- df$Not.Milked.Teats!=""
+df$Kickoff_Bool <- df$Kickoff!=""
+df$Incomplete_Bool <- df$Incomplete!=""
+
+table(df$Not.Milked.Teats, df$Incomplete)
+table(df$Not.Milked.Teats, df$Kickoff)
+table(df$Incomplete, df$Kickoff)
+
+lm.obj<-lm(Yield~Kickoff+Incomplete+Not.Milked.Teats,data=df)
+lm.obj<-lm(Yield~Kickoff_Bool+Incomplete_Bool+Not_Milked_Bool,data=df)
+summary(lm.obj)
+
+table(df$Kickoff_Bool,df$Not_Milked_Bool)
+
+mean(df$Yield)
+mean(subset(df,Kickoff_Bool==TRUE)$Yield)
+mean(subset(df,Not_Milked_Bool==TRUE)$Yield)
+mean(subset(df,Incomplete_Bool==TRUE)$Yield)
+
+sum(subset(df,Kickoff_Bool==TRUE)$Yield)
+sum(subset(df,Not_Milked_Bool==TRUE)$Yield)
+sum(subset(df,Incomplete_Bool==TRUE)$Yield)
+
+```
+
+

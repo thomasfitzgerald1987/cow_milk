@@ -1,0 +1,84 @@
+---
+title: "AMS_Result_Analysis"
+author: "Thomas FitzGerald"
+date: "2024-08-20"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(readxl)
+
+library(tidyverse)
+library(dplyr)
+
+
+library(ggplot2)
+library(ggridges)
+library(plotly)
+
+library(stats)
+library(multcomp)
+library(emmeans)
+library(lsmeans)
+library(stringr)
+library(lubridate)
+```
+
+```{r}
+model_training_plot <- function(df) {
+  ggplot(data=df, aes(x=Epoch)) +
+    geom_smooth(aes(y=Train_Loss), color="red") +
+    geom_smooth(aes(y=Validation_Loss), color="blue") +
+    geom_hline(yintercept=0) + 
+    geom_hline(yintercept=min(df$Validation_Loss), linetype='dashed') +
+    annotate("text",x=max(df$Epoch*.9),y=min(df$Validation_Loss)*.5,label=paste("Min. Loss: ", round(min(df$Validation_Loss),2),sep='')) +
+    geom_vline(xintercept=c(100,250,500,750),linetype='dashed') +
+    ggtitle('Model Training') +
+    xlab('Training Cycles') +
+    ylab('Mean Squared Error') +
+    theme(
+      plot.title=element_text(hjust=.5),
+      axis.title.x=element_text(hjust=.5),
+      axis.title.y=element_text(hjust=.5),
+    )
+}
+
+model_ridgeplot <- function(df,var.name) {
+  var.pred.name <- paste(var.name,'_pred',sep='')
+  df <- df %>% rename(var = var.name) %>% rename(pred = var.pred.name) %>% mutate(var = as.character(var))
+  
+  
+  p <- ggplot(data=df %>% mutate(Starch=as.character(var)), aes(x=pred, y=var, fill=var)) +
+    geom_density_ridges(alpha=0.6) +
+    theme_ridges() +
+    ggtitle(paste('Model Predictions for ',var.name,sep='')) +
+    xlab('Model Prediction') +
+    ylab('True Value') +
+    theme(
+      plot.title=element_text(hjust=.5),
+      axis.title.x=element_text(hjust=.5),
+      axis.title.y=element_text(hjust=.5),
+      legend.position = "none")
+  
+  
+  catlist <- sort(unique(df$var))
+  for (i in 1:length(catlist)){
+    p <- p + geom_segment(aes(x=!!as.numeric(catlist[i]),xend=!!as.numeric(catlist[i]),y=!!i,yend=!!i+1),linetype='dashed')
+  }
+  
+  p
+  return(p)
+}
+```
+
+```{r}
+modelno <- '202409300412'
+dir.str <- 'C:\\Users\\Thoma\\OneDrive\\Desktop\\AMS_Data_Project\\Farm_1\\model_testing\\'
+df.training <- read.csv(paste(dir.str,'Training_',modelno,'_Results','.csv',sep=''))
+df.test <- read.csv(paste(dir.str,'Model_Test_',modelno,'_Results','.csv',sep=''))
+model_ridgeplot(df.test,colnames(df.test)[3])
+```
+
+```{r}
+model_training_plot(df.training)
+```

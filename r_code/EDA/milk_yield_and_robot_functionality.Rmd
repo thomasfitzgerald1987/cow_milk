@@ -1,0 +1,384 @@
+---
+title: "milk_yield_and_robot_functionality"
+author: "Thomas FitzGerald"
+date: "2023-05-04"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(readxl)
+library(dplyr)
+library(plotly)
+library(ggplot2)
+
+library(stringr)
+library(lubridate)
+```
+
+Data Import
+```{r}
+df.1 <- read.csv('C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_1\\HISTORY - Milking ALL.csv')
+
+df.1 <- df.1 %>% mutate(Date.1 = as.Date(Date.Time, format = "%m/%d/%Y"))
+df.1 <- df.1 %>% mutate(Date.2 = as.Date(Date.Time, format = "%Y-%m-%d"))
+df.1 <- df.1 %>% mutate(Date = case_when(
+  is.na(Date.1) ~ Date.2,
+  is.na(Date.2) ~ Date.1))
+
+df.1$Milk.Yield.Dif <- df.1$Milk.Yield.Expected - df.1$Milk.Yield
+
+#Takes formatted milking data
+df.2 <- read.csv('C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_2\\test_out_merged.csv')
+df.2 <- df.2 %>% mutate(Date = as.Date(Date, format = "%m/%d/%Y"))
+#df.2$Milk.Yield.Dif <- df.2$Milk.Yield.Expected - df.2$Milk.Yield
+```
+
+```{r}
+df.1.grouped <- 
+  subset(df.1,!is.na(Milk.Yield)) %>% #This should maybe be converting to 0 instead.  I _think_ they are all non-milking rows, though.
+  group_by(Date) %>%
+  summarise('Mean_Milk_Yield' = mean(Milk.Yield))
+
+df.1.grouped
+#Farm 1 Plot
+plot_ly(df.1.grouped, x = ~Date) %>%
+  add_trace(y = ~Mean_Milk_Yield, type= 'scatter', mode='lines') %>%
+  add_trace(x = as.Date("2022-11-11"), y=c(31,35), type='scatter', mode='lines') %>%
+  add_trace(x = as.Date("2022-12-16"), y=c(31,35), type='scatter', mode='lines') %>%
+  add_trace(x = as.Date("2023-01-04"), y=c(31,35), type='scatter', mode='lines') %>%
+  add_trace(x = as.Date("2023-02-14"), y=c(31,35), type='scatter', mode='lines')
+```
+
+```{r}
+colnames(df.2)
+```
+LF,LR,RF,RR Incomplete, Kickoff, Not_Milked_Teats are our measurements for 'Robot Malfunction'.  Let's broadly group everything by date, then do an lm to check for relationships:
+
+```{r}
+#Time_In_Area,Consumed ommitted
+
+df.2.grouped <- df.2 %>%
+  subset(Event_Type=='Milking') %>% #This should maybe be converting to 0 instead.  I _think_ they are all non-milking rows, though.
+  select(Date,Animal_Number,Milking_Station_Number,Total_Conductivity,Milk_Yield,
+         Duration,Milking_Interval,
+         LF_Kickoff,LR_Kickoff,RF_Kickoff,RR_Kickoff,
+        LF_Incomplete,LR_Incomplete,RF_Incomplete,RR_Incomplete,
+         LF_Not_Milked_Teats,LR_Not_Milked_Teats,RF_Not_Milked_Teats,RR_Not_Milked_Teats) %>%
+  mutate(count = 1,
+              LF_Kickoff=LF_Kickoff=="True",
+              LR_Kickoff=LR_Kickoff=="True",
+              RF_Kickoff=RF_Kickoff=="True",
+              RR_Kickoff=RR_Kickoff=="True",
+              LF_Incomplete=LF_Incomplete=="True",
+              LR_Incomplete=LR_Incomplete=="True",
+              RF_Incomplete=RF_Incomplete=="True",
+              RR_Incomplete=RR_Incomplete=="True",
+              LF_Not_Milked_Teats=LF_Not_Milked_Teats=="True",
+              LR_Not_Milked_Teats=LR_Not_Milked_Teats=="True",
+              RF_Not_Milked_Teats=RF_Not_Milked_Teats=="True",
+              RR_Not_Milked_Teats=RR_Not_Milked_Teats=="True",) %>%
+group_by(Date) %>%
+summarise('Count' = sum(count),
+          'Kickoff_Sum' = sum(LF_Kickoff,LR_Kickoff,RF_Kickoff,RR_Kickoff),
+          'Incomplete_Sum' = sum(LF_Incomplete,LR_Incomplete,RF_Incomplete,RR_Incomplete),
+         'Not_Milked_Sum' = sum(LF_Not_Milked_Teats,LR_Not_Milked_Teats,RF_Not_Milked_Teats,RR_Not_Milked_Teats),
+         'Total_Milk_Yield' = sum(Milk_Yield),
+         'Mean_Milk_Yield' = mean(Milk_Yield),
+         'Mean_Conductivity' = mean(Total_Conductivity),
+         'Mean_Duration' = mean(Duration))
+
+df.2.grouped
+```
+```{r}
+lm.obj <- lm(data=df.2.grouped,Total_Milk_Yield~.)
+summary(lm.obj)
+```
+The strongest relationships to total milk yield are count and mean (no surprise).  Incomplete and Not Milked have little relation to total, but kickoff seems more strongly related.
+
+Now, let's check Correlations to Total Milk Yield
+```{r}
+print('Count')
+cor(df.2.grouped$Total_Milk_Yield,df.2.grouped$Count)
+print('Kickoff')
+cor(df.2.grouped$Total_Milk_Yield,df.2.grouped$Kickoff_Sum)
+print('Incomplete')
+cor(df.2.grouped$Total_Milk_Yield,df.2.grouped$Incomplete_Sum)
+print('Not Milked')
+cor(df.2.grouped$Total_Milk_Yield,df.2.grouped$Not_Milked_Sum)
+print('Duration')
+cor(df.2.grouped$Total_Milk_Yield,df.2.grouped$Mean_Duration)
+```
+Count and yield are highly correlated.  Not surprising: more milkings = more milk.  I suspect kickoff, incomplete, and not milked are just highly correlated to count.
+
+If we check the correlation between robot errors (Kickoff,Incomplete,Not_Milked) and count:
+```{r}
+print('Kickoff')
+cor(df.2.grouped$Count,df.2.grouped$Kickoff_Sum)
+print('Incomplete')
+cor(df.2.grouped$Count,df.2.grouped$Incomplete_Sum)
+print('Not Milked')
+cor(df.2.grouped$Count,df.2.grouped$Not_Milked_Sum)
+print('Duration')
+cor(df.2.grouped$Count,df.2.grouped$Mean_Duration)
+```
+High or extremely high correlations.  Oddly, kickoff is not as strongly correlated with count as the other two.
+
+
+```{r}
+  plot_ly(df.2.grouped,x=~Date,y=~Count)
+  plot_ly(df.2.grouped,x=~Date,y=~Total_Milk_Yield)
+  plot_ly(df.2.grouped,x=~Count,y=~Total_Milk_Yield)
+```
+Machine functionality:
+```{r}
+  plot_ly(df.2.grouped,x=~Date,y=~Kickoff_Sum)
+  plot_ly(df.2.grouped,x=~Date,y=~Incomplete_Sum)
+  plot_ly(df.2.grouped,x=~Date,y=~Not_Milked_Sum)
+  plot_ly(df.2.grouped,x=~Date,y=~Mean_Duration)
+```
+```{r}
+plot_ly(subset(df.2.grouped,,x=~Date,y=~Kickoff_Sum))
+```
+
+
+Yield stats:
+```{r}
+  plot_ly(df.2.grouped,x=~Date,y=~Mean_Milk_Yield)
+  plot_ly(df.2.grouped,x=~Date,y=~Mean_Conductivity)
+```
+
+
+
+From the above, we have a few avenues to explore.  
+
+First, last week's tests using mean milk yield should've been using total milk yield, so we need to re-test those.  
+Secondly, something besides milking count is influencing kickoff that does not influence incomplete/not milked.  We should check kickoff.
+Third, conductivity seems to peak May-September, then drop off.  None of the other metrics have this time trend.  May be worth looking at.
+
+
+For re-testing, let's look at last weeks function:
+```{r}
+#Debug
+df <- df.2.animal.group
+variable.name <- 'Total_Milk_Yield'
+date.of.change <- '2022-12-14'
+i <- 1
+
+over_time_change <- function(df,variable.name,date.of.change){
+  date.of.change <- as.Date(date.of.change)
+  results = data.frame(matrix(ncol=5,nrow=0))
+  colnames(results) <- c('days_from_change','p_value','dif','before_val','after_val')
+  for(i in 1:7){
+    before.date <- as.Date(date.of.change) - i
+    after.date <- as.Date(date.of.change) + i
+    before.values <- subset(df, Date < date.of.change & Date >= before.date)[variable.name]
+    after.values <- subset(df, Date > date.of.change & Date <= after.date)[variable.name]
+    single.results <- t.test(before.values,after.values)
+    results[i,] <- list(i,
+                  single.results$p.value,
+                  single.results$estimate[1]-single.results$estimate[2],
+                  single.results$estimate[1],
+                  single.results$estimate[2])
+  }
+  return(results)
+}
+```
+I see a major issue with this.  We're looking at a distribution of milkings, not of milk production.  We really need to group by animal before testing milk yield.
+
+First, we re-configure our data for testing total milk production per animal (instead of milk return per milking):
+```{r}
+df.2.animal.group <- df.2 %>%
+  subset(Event_Type=='Milking') %>% #This should maybe be converting to 0 instead.  I _think_ they are all non-milking rows, though.
+  select(Date,Animal_Number,Total_Conductivity,Milk_Yield) %>%
+  mutate(Milking_Count=1) %>%
+  group_by(Date,Animal_Number) %>% 
+  summarise('Milking_Count' = sum(Milking_Count),
+        'Total_Milk_Yield' = sum(Milk_Yield),
+         'Mean_Milk_Yield' = mean(Milk_Yield),
+         'Mean_Conductivity' = mean(Total_Conductivity))
+
+df.2.animal.group
+```
+
+```{r}
+over_time_change(df.2.animal.group,'Total_Milk_Yield','2022-11-11')
+over_time_change(df.2.animal.group,'Total_Milk_Yield','2022-11-30')
+over_time_change(df.2.animal.group,'Total_Milk_Yield','2022-12-14')
+over_time_change(df.2.animal.group,'Total_Milk_Yield','2023-02-01')
+```
+Looking at the above, 12/14 had the most noticeable and consistent change in overall milk production, starting at 2 days and peaking at 4.
+
+Let's do some sanity checks:
+```{r}
+over_time_change(df.2.animal.group,'Total_Milk_Yield','2022-11-20')
+over_time_change(df.2.animal.group,'Total_Milk_Yield','2022-12-03')
+over_time_change(df.2.animal.group,'Total_Milk_Yield','2022-12-25')
+over_time_change(df.2.animal.group,'Total_Milk_Yield','2023-01-15')
+```
+
+
+```{r}
+df <- df.2.animal.group
+variable.name <- 'Total_Milk_Yield'
+date.of.change <- '2022-12-14'
+i <- 4
+
+  before.date <- as.Date(date.of.change) - i
+  after.date <- as.Date(date.of.change) + i
+  before.values <- subset(df, Date < date.of.change & Date >= before.date)[variable.name]
+  after.values <- subset(df, Date > date.of.change & Date <= after.date)[variable.name]
+
+df <- rbind(
+  cbind(before.values,type='Before'),
+  cbind(after.values,type='After')
+)
+  
+  
+df %>%
+  plot_ly(type='violin') %>%
+  add_trace(
+    x = ~type[df$type == 'Before'],
+    y = ~Total_Milk_Yield[df$type == 'Before'],
+    legendgroup = 'Before',
+    scalegroup = 'Before',
+    name = 'Before',
+    side = 'negative',
+    box = list(
+      visible = T
+    ),
+    meanline = list(
+      visible = T
+    ),
+    color = I("blue")
+  ) %>%
+    add_trace(
+    x = ~type[df$type == 'After'],
+    y = ~Total_Milk_Yield[df$type == 'After'],
+    legendgroup = 'After',
+    scalegroup = 'After',
+    name = 'After',
+    side = 'positive',
+    box = list(
+      visible = T
+    ),
+    meanline = list(
+      visible = T
+    ),
+    color = I("red")
+  ) %>%
+  layout(
+    xaxis = list(
+      title = ""  
+    ),
+    yaxis = list(
+      title = "",
+      zeroline = F
+    ),
+    violingap = 0,
+    violingroupgap = 0,
+    violinmode = 'overlay'
+  )
+```
+
+
+```{r}
+df.2.grouped.by.machine <- df.2 %>%
+  subset(Event_Type=='Milking') %>% #This should maybe be converting to 0 instead.  I _think_ they are all non-milking rows, though.
+  select(Date,Animal_Number,Milking_Station_Number,Total_Conductivity,Milk_Yield,
+         Duration,Milking_Interval,
+         LF_Kickoff,LR_Kickoff,RF_Kickoff,RR_Kickoff,
+        LF_Incomplete,LR_Incomplete,RF_Incomplete,RR_Incomplete,
+         LF_Not_Milked_Teats,LR_Not_Milked_Teats,RF_Not_Milked_Teats,RR_Not_Milked_Teats) %>%
+  mutate(count = 1,
+              LF_Kickoff=LF_Kickoff=="True",
+              LR_Kickoff=LR_Kickoff=="True",
+              RF_Kickoff=RF_Kickoff=="True",
+              RR_Kickoff=RR_Kickoff=="True",
+              LF_Incomplete=LF_Incomplete=="True",
+              LR_Incomplete=LR_Incomplete=="True",
+              RF_Incomplete=RF_Incomplete=="True",
+              RR_Incomplete=RR_Incomplete=="True",
+              LF_Not_Milked_Teats=LF_Not_Milked_Teats=="True",
+              LR_Not_Milked_Teats=LR_Not_Milked_Teats=="True",
+              RF_Not_Milked_Teats=RF_Not_Milked_Teats=="True",
+              RR_Not_Milked_Teats=RR_Not_Milked_Teats=="True",) %>%
+group_by(Date,Milking_Station_Number) %>%
+summarise('Count' = sum(count),
+          'Kickoff_Sum' = sum(LF_Kickoff,LR_Kickoff,RF_Kickoff,RR_Kickoff),
+          'Incomplete_Sum' = sum(LF_Incomplete,LR_Incomplete,RF_Incomplete,RR_Incomplete),
+         'Not_Milked_Sum' = sum(LF_Not_Milked_Teats,LR_Not_Milked_Teats,RF_Not_Milked_Teats,RR_Not_Milked_Teats),
+         'Total_Milk_Yield' = sum(Milk_Yield),
+         'Mean_Milk_Yield' = mean(Milk_Yield),
+         'Mean_Conductivity' = mean(Total_Conductivity),
+         'Mean_Duration' = mean(Duration))
+
+df.2.grouped.by.machine
+```
+
+```{r}
+df.2.grouped.by.machine$Milking_Station_Number <- as.character(df.2.grouped.by.machine$Milking_Station_Number)
+
+df <- subset(df.2.grouped.by.machine,Milking_Station_Number==1)
+cor(df$Count,df$Total_Milk_Yield)
+cor(df$Kickoff_Sum,df$Total_Milk_Yield)
+sum(df$Total_Milk_Yield)
+df <- subset(df.2.grouped.by.machine,Milking_Station_Number==2)
+cor(df$Count,df$Total_Milk_Yield)
+cor(df$Kickoff_Sum,df$Total_Milk_Yield)
+sum(df$Total_Milk_Yield)
+df <- subset(df.2.grouped.by.machine,Milking_Station_Number==3)
+cor(df$Count,df$Total_Milk_Yield)
+cor(df$Kickoff_Sum,df$Total_Milk_Yield)
+sum(df$Total_Milk_Yield)
+```
+
+```{r}
+plot_ly(df.2.grouped.by.machine,x=~Date,y=~Kickoff_Sum, color=~Milking_Station_Number)
+plot_ly(df.2.grouped.by.machine,x=~Date,y=~Total_Milk_Yield, color=~Milking_Station_Number)
+```
+
+```{r}
+df.2.grouped.by.animal <- df.2 %>%
+  subset(Event_Type=='Milking') %>% #This should maybe be converting to 0 instead.  I _think_ they are all non-milking rows, though.
+  select(Date,Animal_Number,Milking_Station_Number,Total_Conductivity,Milk_Yield,
+         Duration,Milking_Interval,
+         LF_Kickoff,LR_Kickoff,RF_Kickoff,RR_Kickoff,
+        LF_Incomplete,LR_Incomplete,RF_Incomplete,RR_Incomplete,
+         LF_Not_Milked_Teats,LR_Not_Milked_Teats,RF_Not_Milked_Teats,RR_Not_Milked_Teats) %>%
+  mutate(count = 1,
+              LF_Kickoff=LF_Kickoff=="True",
+              LR_Kickoff=LR_Kickoff=="True",
+              RF_Kickoff=RF_Kickoff=="True",
+              RR_Kickoff=RR_Kickoff=="True",
+              LF_Incomplete=LF_Incomplete=="True",
+              LR_Incomplete=LR_Incomplete=="True",
+              RF_Incomplete=RF_Incomplete=="True",
+              RR_Incomplete=RR_Incomplete=="True",
+              LF_Not_Milked_Teats=LF_Not_Milked_Teats=="True",
+              LR_Not_Milked_Teats=LR_Not_Milked_Teats=="True",
+              RF_Not_Milked_Teats=RF_Not_Milked_Teats=="True",
+              RR_Not_Milked_Teats=RR_Not_Milked_Teats=="True",) %>%
+group_by(Date,Animal_Number) %>%
+summarise('Count' = sum(count),
+          'Kickoff_Sum' = sum(LF_Kickoff,LR_Kickoff,RF_Kickoff,RR_Kickoff),
+          'Incomplete_Sum' = sum(LF_Incomplete,LR_Incomplete,RF_Incomplete,RR_Incomplete),
+         'Not_Milked_Sum' = sum(LF_Not_Milked_Teats,LR_Not_Milked_Teats,RF_Not_Milked_Teats,RR_Not_Milked_Teats),
+         'Total_Milk_Yield' = sum(Milk_Yield),
+         'Mean_Milk_Yield' = mean(Milk_Yield),
+         'Mean_Conductivity' = mean(Total_Conductivity),
+         'Mean_Duration' = mean(Duration))
+
+df.2.grouped.by.animal
+```
+
+```{r}
+df.2.grouped.by.animal$Milking_Station_Number <- as.character(df.2.grouped.by.animal$Animal_Number)
+lm.obj <- lm(data=df.2.grouped.by.animal,Total_Milk_Yield~Animal_Number)
+summary(lm.obj)
+
+```
+
+```{r}
+plot_ly(df.2.grouped.by.machine,x=~Date,y=~Kickoff_Sum, color=~Milking_Station_Number)
+plot_ly(df.2.grouped.by.machine,x=~Date,y=~Total_Milk_Yield, color=~Milking_Station_Number)
+```

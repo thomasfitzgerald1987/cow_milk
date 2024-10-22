@@ -1,0 +1,53 @@
+---
+title: "Variable_Selection"
+author: "Thomas FitzGerald"
+date: "2024-08-06"
+output: html_document
+---
+```{r setup, include=FALSE}
+library(tidyverse)
+library(readxl)
+library(dplyr)
+library(plotly)
+library(ggplot2)
+library(stats)
+library(multcomp)
+library(emmeans)
+library(lsmeans)
+library(stringr)
+library(lubridate)
+```
+
+```{r}
+dir.str <- 'C:\\Users\\Thoma\\OneDrive\\Desktop\\Farm_1\\'
+df <- read.csv(paste(dir.str,'datafile_test.csv',sep=''))
+df
+```
+
+```{r}
+lm.obj <- lm(data=df, Haylage_CP ~ Total_Eating_Minutes + Rumination_Minutes + Total_Robot_Feed_1 + Rest_Feed_Robot_Feed_1 + Rest_Feed_Robot_Feed_2 + Total_Intake_Robot_Feed_1 + Total_Intake_Robot_Feed_2)
+summary(lm.obj)
+lm.obj <- lm(data=df, Haylage_Lignin ~ Total_Eating_Minutes + Rumination_Minutes + Total_Robot_Feed_1 + Rest_Feed_Robot_Feed_1 + Rest_Feed_Robot_Feed_2 + Total_Intake_Robot_Feed_1 + Total_Intake_Robot_Feed_2)
+summary(lm.obj)
+lm.obj <- lm(data=df, Haylage_aNDFom ~ Total_Eating_Minutes + Rumination_Minutes + Total_Robot_Feed_1 + Rest_Feed_Robot_Feed_1 + Rest_Feed_Robot_Feed_2 + Total_Intake_Robot_Feed_1 + Total_Intake_Robot_Feed_2)
+summary(lm.obj)
+lm.obj <- lm(data=df, Haylage_Starch ~ Total_Eating_Minutes + Rumination_Minutes + Total_Robot_Feed_1 + Rest_Feed_Robot_Feed_1 + Rest_Feed_Robot_Feed_2 + Total_Intake_Robot_Feed_1 + Total_Intake_Robot_Feed_2)
+summary(lm.obj)
+```
+```{r}
+lm.obj <- lm(data=df, Total_Eating_Minutes ~ Haylage_Lignin	+Haylage_Starch	+Haylage_CP+	Haylage_aNDFom+	PMR_Lignin+	PMR_Starch+	PMR_CP+	PMR_aNDFom+	Corn_Lignin+	Corn_Starch+	Corn_CP+	Corn_aNDFom)
+summary(lm.obj)
+lm.obj <- lm(data=df, Rumination_Minutes ~ Haylage_Lignin	+Haylage_Starch	+Haylage_CP+	Haylage_aNDFom+	PMR_Lignin+	PMR_Starch+	PMR_CP+	PMR_aNDFom+	Corn_Lignin+	Corn_Starch+	Corn_CP+	Corn_aNDFom)
+summary(lm.obj)
+lm.obj <- lm(data=df, Total_Robot_Feed_1 ~ Haylage_Lignin	+Haylage_Starch	+Haylage_CP+	Haylage_aNDFom+	PMR_Lignin+	PMR_Starch+	PMR_CP+	PMR_aNDFom+	Corn_Lignin+	Corn_Starch+	Corn_CP+	Corn_aNDFom)
+summary(lm.obj)
+lm.obj <- lm(data=df, Rest_Feed_Robot_Feed_1 ~ Haylage_Lignin	+Haylage_Starch	+Haylage_CP+	Haylage_aNDFom+	PMR_Lignin+	PMR_Starch+	PMR_CP+	PMR_aNDFom+	Corn_Lignin+	Corn_Starch+	Corn_CP+	Corn_aNDFom)
+summary(lm.obj)
+lm.obj <- lm(data=df, Rest_Feed_Robot_Feed_2 ~ Haylage_Lignin	+Haylage_Starch	+Haylage_CP+	Haylage_aNDFom+	PMR_Lignin+	PMR_Starch+	PMR_CP+	PMR_aNDFom+	Corn_Lignin+	Corn_Starch+	Corn_CP+	Corn_aNDFom)
+summary(lm.obj)
+lm.obj <- lm(data=df, Total_Intake_Robot_Feed_1 ~ Haylage_Lignin	+Haylage_Starch	+Haylage_CP+	Haylage_aNDFom+	PMR_Lignin+	PMR_Starch+	PMR_CP+	PMR_aNDFom+	Corn_Lignin+	Corn_Starch+	Corn_CP+	Corn_aNDFom)
+summary(lm.obj)
+lm.obj <- lm(data=df, Total_Intake_Robot_Feed_2 ~ Haylage_Lignin	+Haylage_Starch	+Haylage_CP+	Haylage_aNDFom+	PMR_Lignin+	PMR_Starch+	PMR_CP+	PMR_aNDFom+	Corn_Lignin+	Corn_Starch+	Corn_CP+	Corn_aNDFom)
+summary(lm.obj)
+```
+

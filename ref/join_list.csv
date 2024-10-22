@@ -1,0 +1,4 @@
+﻿var_name,Type,Examples,Description
+Farm,object,Farm_1,
+Date,datetime64[ns],2023-04-02,Date yyyymmdd
+Animal_Number,int64,5763,Identifier for cow.

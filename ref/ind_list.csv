@@ -1,0 +1,8 @@
+﻿var_name,Type,Examples,Description
+Farm,object,"Farm_1, Farm_2, Farm_3",Farm data originates from
+Date,datetime64[ns],2023-04-02,yyyy-mm-dd
+Date_Time,datetime64[ns],2023-04-02 00:00:00,DateTime yyyy-mm-dd hh:mm:ss
+Event_Type,object,"Milking, Alert",Type of event described in the row.
+Device_Type,object,AMS_Device,Which type of AMS system is being used.
+Animal_Number,int64,5763,Identifier for cow.
+Address,int64,110,Identifier for AMS machine.

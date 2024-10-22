@@ -1,0 +1,68 @@
+---
+title: "Farm_1_EDA"
+author: "Thomas FitzGerald"
+date: "2023-02-13"
+output: html_document
+---
+
+```{r}
+library(readxl)
+library(dplyr)
+library(plotly)
+library(ggplot2)
+library(stringr)
+```
+
+```{r}
+filepath<-'C:\\Users\\Thoma\\OneDrive\\Desktop\\'
+filename<-'Farm1 10-16 to 11-16-22 Feeding.xlsx'
+df<-read_excel(path=paste(filepath,filename,sep=''),
+               skip=7) #Rows 1-7 are not part of table.
+
+#Fix doubled-headers
+colnames(df)[which(colnames(df)=='Total Intake')+1] <- 'Total Intake 2'
+colnames(df)[which(colnames(df)=='Total Intake')] <- 'Total Intake 1'
+
+colnames(df)[which(colnames(df)=='Total')+1] <- 'Total 2'
+colnames(df)[which(colnames(df)=='Total')] <- 'Total 1'
+
+colnames(df)[which(colnames(df)=='Rest Feed')+1] <- 'Rest Feed 2'
+colnames(df)[which(colnames(df)=='Rest Feed')] <- 'Rest Feed 1'
+
+#Re-format column names
+colnames(df)<-str_replace(str_replace(colnames(df),' ','_'),' ','_')
+
+#Remove header line from data
+df<-df[2:nrow(df),]
+
+#Fix numeric column formatting
+df <- df %>% mutate_if(is.character,as.numeric)
+
+#Date
+```
+
+```{r}
+summary(df)
+```
+Time values (Not date_time) may need to be checked
+  Box_Time    
+  Milk_Speed  Seconds while connected/producing milk?
+  Milk_Time   Time in milking station?
+
+Address - Milking station used?  
+Milk_Yield - Liters?
+```{r}
+View(subset(df,Animal_Number==7098))
+```
+
+```{r}
+df[1,]
+
+df$Total_Intake[1]
+
+```
+
+```{r}
+lm.obj<-lm(data=df,Rumination_Minutes~Total_Intake_1+Total_Intake_2)
+summary(lm.obj)
+```
